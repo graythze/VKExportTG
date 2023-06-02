@@ -1,24 +1,22 @@
 import requests
 import time
+import settings
 
 
 def timer():
-    time.sleep(0.36)
+    time.sleep(settings.API_TIMER)
 
 
 def get_numeric_id(id, token, v):
     if id.isnumeric():
         return id
-    else:
-        request = requests.post("https://api.vk.com/method/users.get", data={
-            "user_ids": id,
-            "access_token": token,
-            "v": v}).json()
-        if "response" in request:
-            timer()
-            return request["response"][0]["id"]
-        else:
-            exit("ERROR CODE " + str(request["error"]["error_code"]) + ": " + request["error"]["error_msg"])
+    request = requests.post("https://api.vk.com/method/users.get", data={
+        "user_ids": id,
+        "access_token": token,
+        "v": v}).json()
+    if "response" in request:
+        timer()
+        return request["response"][0]["id"]
 
 
 def docs_get(id, token, v):
@@ -34,8 +32,7 @@ def docs_get(id, token, v):
             "v": v}).json()
         print(request)
         if "response" in request and len(request["response"]["items"]) > 0:
-            for k in request["response"]["items"]:
-                requests_all.append(k)
+            requests_all.extend(iter(request["response"]["items"]))
             offset += 1999
             timer()
         else:
@@ -87,9 +84,7 @@ def gifts_get(id, token, v):
             "v": v}).json()
         print(request)
         if "response" in request and len(request["response"]["items"]) > 0:
-            for k in request["response"]["items"]:
-                # del k['gift_hash']
-                requests_all.append(k)
+            requests_all.extend(iter(request["response"]["items"]))
             offset += 1000
             timer()
         else:
