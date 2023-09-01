@@ -16,11 +16,11 @@ bot = telebot.TeleBot(settings.TELEGRAM_TOKEN, parse_mode=None)
 def clean_folder(folder):
     # Remove files or folders inside of data\
     for content in os.listdir(folder):
-        file_path = os.path.join(folder, content)
-        if os.path.isfile(file_path):
-            os.remove(file_path)
-        elif os.path.isdir(file_path):
-            shutil.rmtree(file_path)
+        content_path = os.path.join(settings.default_path, content)
+        if os.path.isfile(content_path):
+            os.remove(content_path)
+        else:
+            shutil.rmtree(content_path)
 
 
 def find_at(msg):
@@ -177,12 +177,12 @@ def get_info(message):
         for text in util.split_string(result, 4096):
             start_parse_msg = f"<b>[{start_time}] Started parsing for vk.com/id{userid}</b>\n{text}"
             bot.send_message(message.from_user.id, start_parse_msg, parse_mode="HTML")
-        path = f"{settings.default_path}/export{userid}_{time.time()}"
+        path = f"{settings.default_path}/export{userid}_{int(time.time())}"
         print(path)
         os.mkdir(path)
 
         # Define the methods and their corresponding filenames
-        methods_array = [
+        methods_array = (
             ("users_get", "profile"),
             ("wall_get", "wall"),
             ("docs_get", "documents"),
@@ -193,14 +193,15 @@ def get_info(message):
             ("gifts_get", "gifts"),
             ("stories_get", "stories"),
             ("groups_get", "groups"),
-            ("market_get", "market")]
+            ("market_get", "market")
+        )
 
         for method, filename_prefix in methods_array:
             try:
                 data = {"id": at_text, "parsing_started": int(time.time()),
                         method: getattr(methods, method)(userid, settings.VK_TOKEN, settings.V),
                         "parsing_finished": int(time.time())}
-                filename = f"{path}/{filename_prefix}{userid}_{int(time.time())}{settings.FILE_TYPE}"
+                filename = f"{path}/{filename_prefix}{userid}{settings.FILE_TYPE}"
                 create_file(filename)
             except Exception as e:
                 error_message = f"error while parsing {method} section: {e}"
@@ -215,12 +216,12 @@ def get_info(message):
         traceback.print_exc()
     finally:
         print(path)
-        clean_folder(path)
+        shutil.rmtree(path)
 
 
 if os.path.exists(settings.default_path) and os.path.isdir(settings.default_path):
     print(f"Default folder exists. Cleaning {settings.default_path}\\")
-    clean_folder("data")
+    clean_folder(settings.default_path)
 else:
     print(f"Default folder does not exist. Creating {settings.default_path}\\")
     os.mkdir(settings.default_path)
