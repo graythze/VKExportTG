@@ -1,5 +1,6 @@
 import os
 import re
+import sys
 import time
 import shutil
 import telebot
@@ -7,8 +8,13 @@ import methods
 import requests
 import settings
 import traceback
+import argparse
 from telebot import util
 from datetime import datetime
+
+parser = argparse.ArgumentParser(description="Usage: python bot.py")
+parser.add_argument("-v", "--verbose", help="Increase output verbosity", action="store_true")
+args = parser.parse_args()
 
 bot = telebot.TeleBot(settings.TELEGRAM_TOKEN, parse_mode=None)
 
@@ -80,7 +86,7 @@ def get_info(message):
             at_text = re.findall(r'com/(.*)', at_text)[0]
         userid = methods.get_numeric_id(at_text, settings.VK_TOKEN, settings.V)
         start_time = int(time.time())
-        request = methods.users_get(userid, settings.VK_TOKEN, settings.V)[0]
+        request = methods.users_get(userid, settings.VK_TOKEN, settings.V, args.verbose)[0]
 
         data = {}
 
@@ -199,7 +205,7 @@ def get_info(message):
         for method, filename_prefix in methods_array:
             try:
                 data = {"id": at_text, "parsing_started": int(time.time()),
-                        method: getattr(methods, method)(userid, settings.VK_TOKEN, settings.V),
+                        method: getattr(methods, method)(userid, settings.VK_TOKEN, settings.V, args.verbose),
                         "parsing_finished": int(time.time())}
                 filename = f"{path}/{filename_prefix}{userid}{settings.FILE_TYPE}"
                 create_file(filename)
