@@ -2,6 +2,8 @@
   VKExportTG 📄
 
   [RUS](#-что-это) // [ENG](#-what-is-it)
+![image](https://user-images.githubusercontent.com/54765502/133928495-f5f8f111-2cb4-4b7b-96b6-f9f2bde090b2.png)
+
 </h1>
 
 <h1 align="center">
@@ -11,7 +13,6 @@
 # 📄 Что это?
 
 VKExportTG позволяет экспортировать данные в файл JSON с личной страницы ВК или другого человека через Telegram бота
-![image](https://user-images.githubusercontent.com/54765502/133928495-f5f8f111-2cb4-4b7b-96b6-f9f2bde090b2.png)
 
 
 ## ✅ Экспорт доступен для
@@ -73,7 +74,6 @@ options:
 
 ## 📄 What is it?
 VKExportTG allows you to export data to a JSON file from a personal VK page or another page via a Telegram bot
-![image](https://user-images.githubusercontent.com/54765502/133928495-f5f8f111-2cb4-4b7b-96b6-f9f2bde090b2.png)
 
 ## Export available for
 * Profile data <kbd>[users.get](https://vk.com/dev/users.get)</kbd>
