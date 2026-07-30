@@ -3,7 +3,7 @@ import requests
 
 
 TIME_WAIT = 1 / 3
-VK_API_URL = "https://api.vk.com/method/"
+VK_API_URL = "https://api.vk.ru/method/"
 
 
 def make_request(method, data, offset_step, token, version, verbose):
