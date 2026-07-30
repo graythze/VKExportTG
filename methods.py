@@ -1,52 +1,71 @@
-import requests
 import time
+import requests
 
 
-time_wait = 1/3
+TIME_WAIT = 1 / 3
+VK_API_URL = "https://api.vk.com/method/"
 
-def make_request(method, data, def_offset, token, v, verbose):
-    data["access_token"] = token
-    data["v"] = v
+
+def make_request(method, data, offset_step, token, version, verbose):
+    """Fetch all pages returned by a VK method."""
+    request_data = {
+        **data,
+        "access_token": token,
+        "v": version,
+    }
     offset = 0
-    requests_all = []
+    all_items = []
+
     while True:
-        request = requests.post(f"https://api.vk.com/method/{method}", data=data).json()
+        request = requests.post(
+            f"{VK_API_URL}{method}", data=request_data
+        ).json()
         if verbose:
             print(request)
         else:
             print(f"got {method} request for offset {offset}")
-        if "response" in request and len(request["response"]["items"]) > 0:
-            requests_all.extend(iter(request["response"]["items"]))
-            print(data["offset"])
-            if def_offset > 0:
-                offset += def_offset
-                data["offset"] = offset
-                time.sleep(time_wait)
-        else:
-            print(f"{method} parsing ended")
-            time.sleep(time_wait)
-            break
-    return requests_all
 
-def get_numeric_id(id, token, v):
-    if id.isnumeric():
-        return id
-    request = requests.post("https://api.vk.com/method/users.get", data={
-        "user_ids": id,
+        items = request.get("response", {}).get("items", [])
+
+        if not items:
+            print(f"{method} parsing ended")
+            break
+
+        all_items.extend(items)
+        if offset_step <= 0:
+            break
+
+        offset += offset_step
+        request_data["offset"] = offset
+        time.sleep(TIME_WAIT)
+
+    time.sleep(TIME_WAIT)
+    return all_items
+
+
+def get_numeric_id(user_id, token, version):
+    if user_id.isnumeric():
+        return user_id
+
+    request = requests.post(f"{VK_API_URL}users.get", data={
+        "user_ids": user_id,
         "access_token": token,
-        "v": v}).json()
+        "v": version,
+    }).json()
     try:
         return str(request["response"][0]["id"])
-    except Exception:
-        exit(f"CODE {request['error']['error_code']}: {request['error']['error_msg']}")
+    except (KeyError, IndexError, TypeError):
+        error = request.get("error", {})
+        message = error.get("error_msg", "Unable to resolve VK user")
+        code = error.get("error_code", "unknown")
+        raise ValueError(f"CODE {code}: {message}") from None
 
 
 def docs_get(id, token, v, verbose):
-    data = {"count": 2000,
-            "offset": 0,
-            "owner_id": id,
-            "return_tags": 1}
-    return make_request("docs.get", data, 2000, token, v, verbose)
+    return make_request(
+        "docs.get", {"count": 2000, "offset": 0, "owner_id": id, "return_tags": 1},
+        2000, token, v, verbose
+    )
 
 
 def friends_get(id, token, v, verbose):
@@ -94,7 +113,7 @@ def stories_get(id, token, v, verbose):
 
 
 def users_get(id, token, v, verbose):
-    request = requests.post("https://api.vk.com/method/users.get", data={
+    request = requests.post(f"{VK_API_URL}users.get", data={
         "user_ids": id,
         "fields": "uid,first_name,last_name,deactivated,verified,sex,bdate,city,country,home_town,photo_max,"
                   "photo_max_orig,online,lists,domain,has_mobile,can_write_private_message,timezone,screen_name,"
@@ -104,8 +123,9 @@ def users_get(id, token, v, verbose):
         "access_token": token,
         "v": v}).json()
     print(request)
+
     if "response" in request:
-        time.sleep(time_wait)
+        time.sleep(TIME_WAIT)
         return request["response"]
 
 
