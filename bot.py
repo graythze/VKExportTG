@@ -185,8 +185,8 @@ def get_info(message):
 
     try:
         user_input = get_user_input(message)
-        profile_match = re.search(r"^(?:https?://)?(?:www\.)?vk\.(?:com|ru)/([^/?#]+)$",
-                                  user_input.strip(), re.IGNORECASE)
+        profile_match = re.search(r"^(?:https?://)?(?:www\.)?(?:vk\.(?:com|ru)|vkontakte\.(?:com|ru))/([^/?#]+)",
+            user_input.strip(), re.IGNORECASE)
         username = profile_match.group(1) if profile_match else user_input
         user_id = methods.get_numeric_id(username, settings.VK_TOKEN, settings.V)
         start_time = int(time.time())
