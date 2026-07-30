@@ -1,236 +1,248 @@
+import argparse
+import json
 import os
 import re
-import sys
-import time
 import shutil
-import telebot
-import methods
-import requests
-import settings
+import time
 import traceback
-import argparse
-from telebot import util
 from datetime import datetime
+
+import telebot
+from telebot import util
+
+import methods
+import settings
+
 
 parser = argparse.ArgumentParser(description="Usage: python bot.py")
 parser.add_argument("-v", "--verbose", help="Increase output verbosity", action="store_true")
 args = parser.parse_args()
 
 bot = telebot.TeleBot(settings.TELEGRAM_TOKEN, parse_mode=None)
+MAX_ITEMS_PER_FILE = 5000
+
+PLATFORM_NAMES = {
+    1: "m.vk.ru",
+    2: "iPhone",
+    3: "iPad",
+    4: "Android",
+    5: "Windows Phone",
+    6: "Windows 8",
+    7: "vk.ru",
+}
+
+SOCIAL_PREFIXES = {
+    "skype": "@",
+    "instagram": "instagram.com/",
+    "twitter": "twitter.com/",
+    "livejournal": "@",
+    "facebook": "facebook.com/",
+}
+
+EXPORT_SECTIONS = (
+    ("users_get", "profile"),
+    ("wall_get", "wall"),
+    ("docs_get", "documents"),
+    ("photos_get_all", "photos"),
+    ("notes_get", "notes"),
+    ("videos_get", "videos"),
+    ("friends_get", "friends"),
+    ("gifts_get", "gifts"),
+    ("stories_get", "stories"),
+    ("groups_get", "groups"),
+    ("market_get", "market"),
+)
 
 
 def clean_folder(folder):
-    # Remove files or folders inside of data\
-    for content in os.listdir(folder):
-        content_path = os.path.join(settings.default_path, content)
-        if os.path.isfile(content_path):
-            os.remove(content_path)
+    """Remove previously generated exports from the working directory."""
+    for name in os.listdir(folder):
+        path = os.path.join(folder, name)
+        if os.path.isfile(path):
+            os.remove(path)
         else:
-            shutil.rmtree(content_path)
+            shutil.rmtree(path)
 
 
-def find_at(msg):
-    for text in msg:
-        if text in text:
-            return text
+def get_user_input(message):
+    """Extract a VK username or ID from the first word of a message."""
+    value = (message.text or "").split()
+    return value[0].lower() if value else ""
 
 
-def get_country_str(country):
-    time.sleep(settings.API_TIMER)
-    return requests.post("https://api.vk.com/method/database.getCountriesById",
-                                data={"country_ids": str(country),
-                                      "access_token": settings.VK_TOKEN,
-                                      "v": settings.V}).json()['response'][0]
+def send_export_file(filename, data, chat_id):
+    with open(filename, "w", encoding="utf-8") as file:
+        json.dump(data, file, ensure_ascii=False, indent=2)
+    with open(filename, "rb") as document:
+        bot.send_document(chat_id, document)
 
 
-def get_city_str(city):
-    time.sleep(settings.API_TIMER)
-    return requests.get("https://api.vk.com/method/database.getCitiesById",
-                            data={"city_ids": str(city),
-                                  "access_token": settings.VK_TOKEN,
-                                  "v": settings.V}).json()['response'][0]
+def send_export_parts(filename, data, section_name, chat_id):
+    """Save and send a section in files of at most 1000 items."""
+    all_items = data.get(section_name)
+    if not isinstance(all_items, list) or len(all_items) <= MAX_ITEMS_PER_FILE:
+        send_export_file(filename, data, chat_id)
+        return
+
+    filename_root, filename_extension = os.path.splitext(filename)
+    for part_number, start in enumerate(
+        range(0, len(all_items), MAX_ITEMS_PER_FILE), start=1
+    ):
+        part_data = {
+            "id": data["id"],
+            section_name: all_items[start : start + MAX_ITEMS_PER_FILE],
+        }
+        part_filename = f"{filename_root}_part{part_number}{filename_extension}"
+        send_export_file(part_filename, part_data, chat_id)
 
 
-def creating_files(filename, data):
-    with open(filename, mode="w", encoding="utf-8") as file:
-        file.write(str(data))
-    doc = open(filename, 'rb')
-    doc.close()
+def format_profile(profile):
+    """Convert the useful profile fields into the human-readable summary."""
+    result = {}
 
+    if "id" in profile:
+        result["ID"] = profile["id"]
+    if profile.get("first_name") and profile.get("last_name"):
+        result["Name"] = f"{profile['first_name']} {profile['last_name']}"
+    else:
+        if profile.get("first_name"):
+            result["First name"] = profile["first_name"]
+        if profile.get("last_name"):
+            result["Last name"] = profile["last_name"]
 
-@bot.message_handler(commands=['start'])
-def regular_message(message):
-    bot.send_message(message.chat.id, "<b>🤖 Welcome to bot!</b>\n"
-                                      "\nBot allows export public data from any VK user page\n"
-                                      "\n🔎 To start, send user ID or nickname to start.\n"
-                                      '\nAllowed types:'
-                                      '\n   Nickname: <b>durov</b>'
-                                      '\n   Origin ID: <b>id1</b>'
-                                      '\n   Numeric ID: <b>1</b>', parse_mode="HTML")
+    optional_fields = {
+        "nickname": "Middle name",
+        "maiden_name": "Maiden name",
+        "bdate": "Birthday",
+        "site": "Site",
+        "status": "Status",
+        "mobile_phone": "Mobile",
+        "home_phone": "Home phone",
+    }
+    for field, label in optional_fields.items():
+        if profile.get(field):
+            result[label] = profile[field]
 
+    if profile.get("sex") == 1:
+        result["Sex"] = "Female"
+    elif profile.get("sex") == 2:
+        result["Sex"] = "Male"
 
-@bot.message_handler(func=lambda msg: msg.text is not None)
-def get_info(message):
-    global path
+    if "last_seen" in profile and "deactivated" not in profile:
+        last_seen = profile["last_seen"]
+        result["Last seen"] = datetime.utcfromtimestamp(last_seen["time"]).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
+        if last_seen.get("platform") in PLATFORM_NAMES:
+            result["Platform"] = PLATFORM_NAMES[last_seen["platform"]]
+    else:
+        result["Last seen"] = "Hidden by vk.me/app"
 
-    def create_file(filename):
-        with open(filename, mode="w", encoding="utf-8") as file:
-            file.write(str(data))
-        with open(filename, 'rb') as doc:
-            bot.send_document(message.from_user.id, doc)
+    for name, prefix in SOCIAL_PREFIXES.items():
+        if profile.get(name):
+            result[name.capitalize()] = f"{prefix}{profile[name]}"
 
-    try:
-        got_text = message.text.split()
-        at_text = find_at(got_text).lower()
-        if len(re.findall(r'com/(.*)', at_text)) > 0:
-            at_text = re.findall(r'com/(.*)', at_text)[0]
-        userid = methods.get_numeric_id(at_text, settings.VK_TOKEN, settings.V)
-        start_time = int(time.time())
-        request = methods.users_get(userid, settings.VK_TOKEN, settings.V, args.verbose)[0]
-
-        data = {}
-
-        if 'id' in request:
-            data["ID"] = request['id']
-
-        if 'first_name' and 'last_name' in request:
-            data["Name"] = f"{request['first_name']} {request['last_name']}"
-        else:
-            if 'first_name' in request and len(request['first_name']) > 0:
-                data["First name"] = request['first_name']
-
-            if 'last_name' in request and len(request['last_name']) > 0:
-                data["Last name"] = request['last_name']
-
-        if 'nickname' in request and len(request['nickname']) > 0:
-            data["Middle name"] = request['nickname']
-
-        if 'maiden_name' in request and len(request['maiden_name']) > 0:
-            data["Maiden name"] = request['maiden_name']
-
-        if 'sex' in request and len(request['last_name']) > 0:
-            if request['sex'] == 1:
-                data["Sex"] = 'Female'
-            elif request['sex'] == 2:
-                data["Sex"] = 'Male'
-
-        if 'bdate' in request:
-            data["Birthday"] = request['bdate']
-
-        if 'site' in request and len(request['site']) > 0:
-            data["Site"] = request["site"]
-
-        platform_map = {
-            1: "m.vk.com",
-            2: "iPhone",
-            3: "iPad",
-            4: "Android",
-            5: "Windows Phone",
-            6: "Windows 8",
-            7: "vk.com"}
-
-        if 'last_seen' in request and "deactivated" not in request:
-            last_seen = request["last_seen"]
-            data["Last seen"] = datetime.utcfromtimestamp(last_seen.get("time")).strftime('%Y-%m-%d %H:%M:%S')
-            platform_id = last_seen.get("platform")
-            if platform_id in platform_map:
-                data["Platform"] = platform_map[platform_id]
-        elif "deactivated" in request:
-            pass
-        else:
-            data["Last seen"] = "Hidden by vk.me/app"
-
-        if 'status' in request and len(request["status"]) > 0:
-            data["Status"] = request["status"]
-
-        if 'mobile_phone' in request and len(request["mobile_phone"]) > 0:
-            data["Mobile"] = request["mobile_phone"]
-
-        if 'home_phone' in request and len(request["home_phone"]) > 0:
-            data["Home phone"] = request["home_phone"]
-
-        socials = [("skype", "@"),
-                   ("instagram", "instagram.com/"),
-                   ("twitter", "twitter.com/"),
-                   ("livejournal", "@"),
-                   ("facebook", "facebook.com/")]
-
-        for social in socials:
-            if social[0] in request:
-                data[f"{social[0].capitalize()}"] = f"{social[1]}{request[social[0]]}"
-
-        if 'crop_photo' not in request:
-            data["Avatar"] = request["photo_max_orig"]
-        else:
-            if 'photo' in request["crop_photo"]:
-                full_size = max(request["crop_photo"]["photo"]['sizes'], key=lambda line: int(line['width']))
-                data["Avatar"] = full_size['url']
-            if 'date' in request["crop_photo"]["photo"]:
-                data["Avatar date"] = datetime.utcfromtimestamp(
-                    request["crop_photo"]["photo"]["date"]).strftime('%Y-%m-%d %H:%M:%S')
-
-        def serialize(data):
-            rslt = []
-            for key, value in data.items():
-                rslt += f"<b>— {key}</b>: {value}" + "\n"
-            return ''.join(rslt)
-
-        result = serialize(data)
-
-        for i in settings.TO_REMOVE:
-            result = result.replace(i, '')
-
-        for text in util.split_string(result, 4096):
-            start_parse_msg = f"<b>[{start_time}] Started parsing for vk.com/id{userid}</b>\n{text}"
-            bot.send_message(message.from_user.id, start_parse_msg, parse_mode="HTML")
-        path = f"{settings.default_path}/export{userid}_{int(time.time())}"
-        print(path)
-        os.mkdir(path)
-
-        # Define the methods and their corresponding filenames
-        methods_array = (
-            ("users_get", "profile"),
-            ("wall_get", "wall"),
-            ("docs_get", "documents"),
-            ("photos_get_all", "photos"),
-            ("notes_get", "notes"),
-            ("videos_get", "videos"),
-            ("friends_get", "friends"),
-            ("gifts_get", "gifts"),
-            ("stories_get", "stories"),
-            ("groups_get", "groups"),
-            ("market_get", "market")
+    crop_photo = profile.get("crop_photo", {}).get("photo", {})
+    sizes = crop_photo.get("sizes", [])
+    if sizes:
+        result["Avatar"] = max(sizes, key=lambda size: int(size["width"]))["url"]
+    elif profile.get("photo_max_orig"):
+        result["Avatar"] = profile["photo_max_orig"]
+    if crop_photo.get("date"):
+        result["Avatar date"] = datetime.utcfromtimestamp(crop_photo["date"]).strftime(
+            "%Y-%m-%d %H:%M:%S"
         )
 
-        for method, filename_prefix in methods_array:
+    return result
+
+
+def profile_message(profile_data):
+    message = "".join(
+        f"<b>— {key}</b>: {value}\n" for key, value in profile_data.items()
+    )
+    for text_to_remove in settings.TO_REMOVE:
+        message = message.replace(text_to_remove, "")
+    return message
+
+
+@bot.message_handler(commands=["start"])
+def regular_message(message):
+    bot.send_message(
+        message.chat.id,
+        "<b>🤖 Welcome to bot!</b>\n\n"
+        "Bot allows export public data from any VK user page\n\n"
+        "🔎 To start, send user ID or nickname to start.\n\n"
+        "Allowed types:\n   Nickname: <b>durov</b>\n"
+        "   Origin ID: <b>id1</b>\n   Numeric ID: <b>1</b>",
+        parse_mode="HTML",
+    )
+
+
+@bot.message_handler(func=lambda message: message.text is not None)
+def get_info(message):
+    export_path = None
+    chat_id = message.from_user.id
+
+    try:
+        user_input = get_user_input(message)
+        profile_match = re.search(r"(?:https?://)?(?:www\.)?vk\.com/(.+)", user_input)
+        username = profile_match.group(1) if profile_match else user_input
+        user_id = methods.get_numeric_id(username, settings.VK_TOKEN, settings.V)
+        start_time = int(time.time())
+        profile = methods.users_get(user_id, settings.VK_TOKEN, settings.V, args.verbose)[0]
+
+        for text in util.split_string(profile_message(format_profile(profile)), 4096):
+            bot.send_message(
+                chat_id,
+                f"<b>[{start_time}] Started parsing for vk.ru/id{user_id}</b>\n{text}",
+                parse_mode="HTML",
+            )
+
+        export_path = os.path.join(settings.default_path, f"export{user_id}_{int(time.time())}")
+        os.mkdir(export_path)
+
+        for method_name, filename_prefix in EXPORT_SECTIONS:
             try:
-                data = {"id": at_text, "parsing_started": int(time.time()),
-                        method: getattr(methods, method)(userid, settings.VK_TOKEN, settings.V, args.verbose),
-                        "parsing_finished": int(time.time())}
-                filename = f"{path}/{filename_prefix}{userid}{settings.FILE_TYPE}"
-                create_file(filename)
-            except Exception as e:
-                error_message = f"error while parsing {method} section: {e}"
-                bot.send_message(message.from_user.id, error_message, parse_mode="HTML")
+                exported_data = {
+                    "id": username,
+                    method_name: getattr(methods, method_name)(
+                        user_id, settings.VK_TOKEN, settings.V, args.verbose
+                    ),
+                }
+                filename = os.path.join(
+                    export_path, f"{filename_prefix}{user_id}{settings.FILE_TYPE}"
+                )
+                send_export_parts(filename, exported_data, method_name, chat_id)
+            except Exception as error:
+                bot.send_message(
+                    chat_id,
+                    f"error while parsing {method_name} section: {error}",
+                    parse_mode="HTML",
+                )
 
         end_time = int(time.time())
-        eng_parse_msg = f"<b>[{end_time}] End parsing of vk.com/id{userid}. Elapsed {end_time - start_time} seconds</b>"
-        bot.send_message(message.from_user.id, eng_parse_msg, parse_mode="HTML")
-    except Exception as e:
-        exception_msg = "<b>Looks like you entered negative or zero id. Enter the right ID or nickname.</b>"
-        bot.send_message(message.from_user.id, f"<b> {exception_msg} \n {e}</b>", parse_mode="HTML")
+        bot.send_message(
+            chat_id,
+            f"<b>[{end_time}] End parsing of vk.ru/id{user_id}. "
+            f"Elapsed {end_time - start_time} seconds</b>",
+            parse_mode="HTML",
+        )
+    except Exception as error:
+        error_message = "Looks like you entered an invalid ID or nickname."
+        bot.send_message(chat_id, f"<b>{error_message}\n{error}</b>", parse_mode="HTML")
         traceback.print_exc()
     finally:
-        print(path)
-        shutil.rmtree(path)
+        if export_path and os.path.isdir(export_path):
+            shutil.rmtree(export_path)
 
 
-if os.path.exists(settings.default_path) and os.path.isdir(settings.default_path):
+if os.path.isdir(settings.default_path):
     print(f"Default folder exists. Cleaning {settings.default_path}\\")
     clean_folder(settings.default_path)
 else:
     print(f"Default folder does not exist. Creating {settings.default_path}\\")
     os.mkdir(settings.default_path)
+
 
 while True:
     try:
