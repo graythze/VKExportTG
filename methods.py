@@ -129,6 +129,7 @@ def users_get(id: int, verbose: bool) -> Any | None:
         "access_token": token,
         "v": version}).json()
     logger.debug("VK users.get response: %s", request)
+    logger.info("Got users.get response")
 
     if "response" in request:
         time.sleep(TIME_WAIT)

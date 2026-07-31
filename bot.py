@@ -1,9 +1,8 @@
 import argparse
+import io
 import json
 import logging
-import os
 import re
-import shutil
 import time
 import traceback
 from datetime import datetime
@@ -119,16 +118,6 @@ def examples_text() -> str:
     )
 
 
-def clean_folder(folder) -> None:
-    """Remove previously generated exports from the working directory."""
-    for name in os.listdir(folder):
-        path = os.path.join(folder, name)
-        if os.path.isfile(path):
-            os.remove(path)
-        else:
-            shutil.rmtree(path)
-
-
 def get_user_input(message):
     """Extract a VK username or ID from the first word of a message."""
     value = (message.text or "").split()
@@ -136,10 +125,13 @@ def get_user_input(message):
 
 
 def send_export_file(filename, data, chat_id) -> None:
-    with open(filename, "w", encoding="utf-8") as file:
-        json.dump(data, file, ensure_ascii=False, indent=2)
-    with open(filename, "rb") as document:
-        bot.send_document(chat_id, document)
+    """Serialize an export to an in-memory file and send it to Telegram."""
+    document = io.BytesIO(
+        json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
+    )
+    document.name = filename
+    document.seek(0)
+    bot.send_document(chat_id, document)
 
 
 def send_export_parts(filename, data, section_name, chat_id) -> None:
@@ -149,7 +141,8 @@ def send_export_parts(filename, data, section_name, chat_id) -> None:
         send_export_file(filename, data, chat_id)
         return
 
-    filename_root, filename_extension = os.path.splitext(filename)
+    filename_root, filename_extension = filename.rsplit(".", 1)
+    filename_extension = "." + filename_extension
     for part_number, start in enumerate(
         range(0, len(all_items), MAX_ITEMS_PER_FILE), start=1
     ):
@@ -275,7 +268,6 @@ def keyboard_action(message):
 
 @bot.message_handler(func=lambda message: message.text is not None)
 def get_info(message):
-    export_path = None
     chat_id = message.from_user.id
 
     waiting_for_identifier.discard(chat_id)
@@ -296,8 +288,7 @@ def get_info(message):
                 parse_mode="HTML",
             )
 
-        export_path = os.path.join(settings.default_path, f"export{user_id}_{int(time.time())}")
-        os.mkdir(export_path)
+        export_prefix = f"export{user_id}_{int(time.time())}"
 
         for method_name, filename_prefix in EXPORT_SECTIONS:
             try:
@@ -306,9 +297,7 @@ def get_info(message):
                         user_id, args.verbose
                     ),
                 }
-                filename = os.path.join(
-                    export_path, f"{filename_prefix}{user_id}{settings.FILE_TYPE}"
-                )
+                filename = f"{export_prefix}/{filename_prefix}{user_id}{settings.FILE_TYPE}"
                 send_export_parts(filename, exported_data, method_name, chat_id)
             except Exception as error:
                 bot.send_message(
@@ -328,19 +317,6 @@ def get_info(message):
         error_message = "Looks like you entered an invalid ID or nickname."
         bot.send_message(chat_id, f"<b>{error_message}\n{error}</b>", parse_mode="HTML")
         logger.exception("Failed to process VK export request")
-    finally:
-        if export_path and os.path.isdir(export_path):
-            shutil.rmtree(export_path)
-
-
-if os.path.isdir(settings.default_path):
-    logger.info("Default folder exists. Cleaning %s", settings.default_path)
-    clean_folder(settings.default_path)
-else:
-    logger.info("Default folder does not exist. Creating %s", settings.default_path)
-    os.mkdir(settings.default_path)
-
-
 while True:
     try:
         bot.polling()
