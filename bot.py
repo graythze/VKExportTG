@@ -1,5 +1,6 @@
 import argparse
 import json
+import logging
 import os
 import re
 import shutil
@@ -8,10 +9,14 @@ import traceback
 from datetime import datetime
 
 import telebot
-from telebot import util
+from telebot import types, util
 
 import methods
 import settings
+
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logger = logging.getLogger(__name__)
 
 
 parser = argparse.ArgumentParser(description="Usage: python bot.py")
@@ -20,6 +25,8 @@ args = parser.parse_args()
 
 bot = telebot.TeleBot(settings.TELEGRAM_TOKEN, parse_mode=None)
 MAX_ITEMS_PER_FILE = 5000
+
+waiting_for_identifier = set()
 
 PLATFORM_NAMES = {
     1: "m.vk.ru",
@@ -51,10 +58,68 @@ EXPORT_SECTIONS = (
     ("stories_get", "stories"),
     ("groups_get", "groups"),
     ("market_get", "market"),
+    ("followers_get", "followers")
 )
 
 
-def clean_folder(folder):
+def main_keyboard() -> types.ReplyKeyboardMarkup:
+    """Persistent keyboard for the most common actions."""
+    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    keyboard.add(
+        types.KeyboardButton("🔎 Новый экспорт"),
+        types.KeyboardButton("💡 Примеры ввода"),
+        types.KeyboardButton("📋 Возможности")
+    )
+    return keyboard
+
+
+def menu_markup() -> types.InlineKeyboardMarkup:
+    keyboard = types.InlineKeyboardMarkup(row_width=2)
+    keyboard.add(
+        types.InlineKeyboardButton("🔎 Новый экспорт", callback_data="menu:export"),
+        types.InlineKeyboardButton("📋 Возможности", callback_data="menu:features"),
+        types.InlineKeyboardButton("💡 Примеры ввода", callback_data="menu:examples"),
+    )
+    return keyboard
+
+
+def send_menu(chat_id, text=None) -> None:
+    text = text or (
+        "<b>VK Export</b>\n\n"
+        "Выберите действие ниже или отправьте ID, логин либо ссылку на профиль VK."
+    )
+    bot.send_message(
+        chat_id, text, parse_mode="HTML", reply_markup=main_keyboard()
+    )
+    bot.send_message(chat_id, "Что будем делать?", reply_markup=menu_markup())
+
+
+def features_text() -> str:
+    return (
+        "<b>📋 Что умеет бот</b>\n\n"
+        "• Загружает публичный профиль VK\n"
+        "• Экспортирует стену, фото, видео и документы\n"
+        "• Выгружает друзей, группы, подарки, истории и товары\n"
+        "• Отправляет каждый раздел отдельным JSON-файлом\n"
+        "• Большие разделы автоматически разбиваются на части\n\n"
+        "Доступность данных зависит от настроек приватности VK."
+    )
+
+
+def examples_text() -> str:
+    return (
+        "<b>💡 Примеры ввода</b>\n\n"
+        "<code>durov</code>\n"
+        "<code>id1</code>\n"
+        "<code>1</code>\n"
+        "<code>https://vk.ru/durov</code>\n"
+        "<code>https://vk.com/durov</code>\n"
+        "<code>https://vkontakte.com/durov</code>\n"
+        "<code>https://vkontakte.ru/durov</code>\n"
+    )
+
+
+def clean_folder(folder) -> None:
     """Remove previously generated exports from the working directory."""
     for name in os.listdir(folder):
         path = os.path.join(folder, name)
@@ -70,14 +135,14 @@ def get_user_input(message):
     return value[0].lower() if value else ""
 
 
-def send_export_file(filename, data, chat_id):
+def send_export_file(filename, data, chat_id) -> None:
     with open(filename, "w", encoding="utf-8") as file:
         json.dump(data, file, ensure_ascii=False, indent=2)
     with open(filename, "rb") as document:
         bot.send_document(chat_id, document)
 
 
-def send_export_parts(filename, data, section_name, chat_id):
+def send_export_parts(filename, data, section_name, chat_id) -> None:
     """Save and send a section in files of at most 1000 items."""
     all_items = data.get(section_name)
     if not isinstance(all_items, list) or len(all_items) <= MAX_ITEMS_PER_FILE:
@@ -89,14 +154,13 @@ def send_export_parts(filename, data, section_name, chat_id):
         range(0, len(all_items), MAX_ITEMS_PER_FILE), start=1
     ):
         part_data = {
-            "id": data["id"],
             section_name: all_items[start : start + MAX_ITEMS_PER_FILE],
         }
         part_filename = f"{filename_root}_part{part_number}{filename_extension}"
         send_export_file(part_filename, part_data, chat_id)
 
 
-def format_profile(profile):
+def format_profile(profile) -> dict:
     """Convert the useful profile fields into the human-readable summary."""
     result = {}
 
@@ -130,7 +194,7 @@ def format_profile(profile):
 
     if "last_seen" in profile and "deactivated" not in profile:
         last_seen = profile["last_seen"]
-        result["Last seen"] = datetime.utcfromtimestamp(last_seen["time"]).strftime(
+        result["Last seen"] = datetime.fromtimestamp(last_seen["time"]).strftime(
             "%Y-%m-%d %H:%M:%S"
         )
         if last_seen.get("platform") in PLATFORM_NAMES:
@@ -149,14 +213,14 @@ def format_profile(profile):
     elif profile.get("photo_max_orig"):
         result["Avatar"] = profile["photo_max_orig"]
     if crop_photo.get("date"):
-        result["Avatar date"] = datetime.utcfromtimestamp(crop_photo["date"]).strftime(
+        result["Avatar date"] = datetime.fromtimestamp(crop_photo["date"]).strftime(
             "%Y-%m-%d %H:%M:%S"
         )
 
     return result
 
 
-def profile_message(profile_data):
+def profile_message(profile_data) -> str:
     message = "".join(
         f"<b>— {key}</b>: {value}\n" for key, value in profile_data.items()
     )
@@ -165,17 +229,48 @@ def profile_message(profile_data):
     return message
 
 
-@bot.message_handler(commands=["start"])
+@bot.message_handler(commands=["start", "menu"])
 def regular_message(message):
-    bot.send_message(
-        message.chat.id,
-        "<b>🤖 Welcome to bot!</b>\n\n"
-        "Bot allows export public data from any VK user page\n\n"
-        "🔎 To start, send user ID or nickname to start.\n\n"
-        "Allowed types:\n   Nickname: <b>durov</b>\n"
-        "   Origin ID: <b>id1</b>\n   Numeric ID: <b>1</b>",
-        parse_mode="HTML",
-    )
+    waiting_for_identifier.discard(message.chat.id)
+    send_menu(message.chat.id)
+
+
+@bot.message_handler(commands=["help"])
+def help_message(message):
+    send_menu(message.chat.id, features_text())
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("menu:"))
+def menu_callback(call):
+    action = call.data.split(":", 1)[1]
+    bot.answer_callback_query(call.id)
+    if action == "export":
+        waiting_for_identifier.add(call.message.chat.id)
+        bot.send_message(
+            call.message.chat.id,
+            "<b>🔎 Новый экспорт</b>\n\n"
+            "Отправьте ID, короткое имя или ссылку на профиль VK.",
+            parse_mode="HTML",
+            reply_markup=main_keyboard(),
+        )
+        bot.send_message(call.message.chat.id, examples_text(), parse_mode="HTML", reply_markup=menu_markup())
+    elif action == "features":
+        bot.send_message(call.message.chat.id, features_text(), parse_mode="HTML", reply_markup=menu_markup())
+    elif action == "examples":
+        bot.send_message(call.message.chat.id, examples_text(), parse_mode="HTML", reply_markup=menu_markup())
+
+
+@bot.message_handler(func=lambda message: message.text in {
+    "🔎 Новый экспорт", "💡 Примеры ввода", "📋 Возможности"
+})
+def keyboard_action(message):
+    if message.text == "🔎 Новый экспорт":
+        waiting_for_identifier.add(message.chat.id)
+        bot.send_message(message.chat.id, "Отправьте ID, короткое имя или ссылку VK.", reply_markup=main_keyboard())
+    elif message.text == "📋 Возможности":
+        send_menu(message.chat.id, features_text())
+    else:
+        send_menu(message.chat.id, examples_text())
 
 
 @bot.message_handler(func=lambda message: message.text is not None)
@@ -183,19 +278,21 @@ def get_info(message):
     export_path = None
     chat_id = message.from_user.id
 
+    waiting_for_identifier.discard(chat_id)
+
     try:
         user_input = get_user_input(message)
         profile_match = re.search(r"^(?:https?://)?(?:www\.)?(?:vk\.(?:com|ru)|vkontakte\.(?:com|ru))/([^/?#]+)",
             user_input.strip(), re.IGNORECASE)
         username = profile_match.group(1) if profile_match else user_input
-        user_id = methods.get_numeric_id(username, settings.VK_TOKEN, settings.V)
+        user_id = methods.get_numeric_id(username)
         start_time = int(time.time())
-        profile = methods.users_get(user_id, settings.VK_TOKEN, settings.V, args.verbose)[0]
+        profile = methods.users_get(user_id, args.verbose)[0]
 
         for text in util.split_string(profile_message(format_profile(profile)), 4096):
             bot.send_message(
                 chat_id,
-                f"<b>[{start_time}] Started parsing for vk.ru/id{user_id}</b>\n{text}",
+                f"<b>Parsing vk.ru/id{user_id}</b>\n{text}",
                 parse_mode="HTML",
             )
 
@@ -205,9 +302,8 @@ def get_info(message):
         for method_name, filename_prefix in EXPORT_SECTIONS:
             try:
                 exported_data = {
-                    "id": username,
                     method_name: getattr(methods, method_name)(
-                        user_id, settings.VK_TOKEN, settings.V, args.verbose
+                        user_id, args.verbose
                     ),
                 }
                 filename = os.path.join(
@@ -231,17 +327,17 @@ def get_info(message):
     except Exception as error:
         error_message = "Looks like you entered an invalid ID or nickname."
         bot.send_message(chat_id, f"<b>{error_message}\n{error}</b>", parse_mode="HTML")
-        traceback.print_exc()
+        logger.exception("Failed to process VK export request")
     finally:
         if export_path and os.path.isdir(export_path):
             shutil.rmtree(export_path)
 
 
 if os.path.isdir(settings.default_path):
-    print(f"Default folder exists. Cleaning {settings.default_path}\\")
+    logger.info("Default folder exists. Cleaning %s", settings.default_path)
     clean_folder(settings.default_path)
 else:
-    print(f"Default folder does not exist. Creating {settings.default_path}\\")
+    logger.info("Default folder does not exist. Creating %s", settings.default_path)
     os.mkdir(settings.default_path)
 
 
@@ -249,5 +345,5 @@ while True:
     try:
         bot.polling()
     except Exception:
-        traceback.print_exc()
+        logger.exception("Bot polling failed")
         time.sleep(1)
