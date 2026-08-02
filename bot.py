@@ -100,7 +100,7 @@ def features_text() -> str:
         "• Экспортирует стену, фото, видео и документы\n"
         "• Выгружает друзей, группы, подарки, истории и товары\n"
         "• Отправляет каждый раздел отдельным JSON-файлом\n"
-        "• Большие разделы автоматически разбиваются на части\n\n"
+        "• Большие файлы (>50МБ) автоматически разбиваются на части\n\n"
         "Доступность данных зависит от настроек приватности VK."
     )
 
@@ -222,6 +222,36 @@ def profile_message(profile_data) -> str:
     return message
 
 
+def is_authorized(user_id) -> bool:
+    """Zero (0) allows anyone to interact with bot."""
+    if 0 in settings.ALLOWED_USER_IDS:
+        return True
+    else:
+        if user_id in settings.ALLOWED_USER_IDS:
+            return True
+        else:
+            return False
+
+
+@bot.message_handler(commands=["myid"])
+def my_id_message(message):
+    bot.send_message(message.chat.id, f"Telegram ID: {message.from_user.id}")
+
+
+@bot.message_handler(func=lambda message: not is_authorized(message.from_user.id))
+def unauthorized_message(message):
+    bot.send_message(message.chat.id, "Пользователю запрещено использовать этого бота.")
+
+
+@bot.callback_query_handler(func=lambda call: not is_authorized(call.from_user.id))
+def unauthorized_callback(call):
+    bot.answer_callback_query(
+        call.id,
+        "Пользователю запрещено использовать этого бота.",
+        show_alert=True,
+    )
+
+
 @bot.message_handler(commands=["start", "menu"])
 def regular_message(message):
     waiting_for_identifier.discard(message.chat.id)
@@ -309,7 +339,7 @@ def get_info(message):
         end_time = int(time.time())
         bot.send_message(
             chat_id,
-            f"<b>[{end_time}] End parsing of vk.ru/id{user_id}. "
+            f"<b>End parsing for vk.ru/id{user_id}. "
             f"Elapsed {end_time - start_time} seconds</b>",
             parse_mode="HTML",
         )
@@ -317,6 +347,7 @@ def get_info(message):
         error_message = "Looks like you entered an invalid ID or nickname."
         bot.send_message(chat_id, f"<b>{error_message}\n{error}</b>", parse_mode="HTML")
         logger.exception("Failed to process VK export request")
+
 while True:
     try:
         bot.polling()
