@@ -2,10 +2,10 @@ import logging
 import time
 from typing import Dict, Any
 import requests
-import settings
+import config
 
-token = settings.VK_TOKEN
-version = settings.V
+token = config.VK_TOKEN
+version = config.VK_API_VERSION
 
 TIME_WAIT = 1 / 3
 VK_API_URL = "https://api.vk.ru/method/"

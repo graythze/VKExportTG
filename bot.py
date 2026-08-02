@@ -11,7 +11,7 @@ import telebot
 from telebot import types, util
 
 import methods
-import settings
+import config
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -22,7 +22,7 @@ parser = argparse.ArgumentParser(description="Usage: python bot.py")
 parser.add_argument("-v", "--verbose", help="Increase output verbosity", action="store_true")
 args = parser.parse_args()
 
-bot = telebot.TeleBot(settings.TELEGRAM_TOKEN, parse_mode=None)
+bot = telebot.TeleBot(config.TELEGRAM_TOKEN, parse_mode=None)
 MAX_ITEMS_PER_FILE = 5000
 
 waiting_for_identifier = set()
@@ -217,17 +217,17 @@ def profile_message(profile_data) -> str:
     message = "".join(
         f"<b>— {key}</b>: {value}\n" for key, value in profile_data.items()
     )
-    for text_to_remove in settings.TO_REMOVE:
+    for text_to_remove in config.TO_REMOVE:
         message = message.replace(text_to_remove, "")
     return message
 
 
 def is_authorized(user_id) -> bool:
     """Zero (0) allows anyone to interact with bot."""
-    if 0 in settings.ALLOWED_USER_IDS:
+    if 0 in config.ALLOWED_USER_IDS:
         return True
     else:
-        if user_id in settings.ALLOWED_USER_IDS:
+        if user_id in config.ALLOWED_USER_IDS:
             return True
         else:
             return False
@@ -327,7 +327,7 @@ def get_info(message):
                         user_id, args.verbose
                     ),
                 }
-                filename = f"{export_prefix}/{filename_prefix}{user_id}{settings.FILE_TYPE}"
+                filename = f"{export_prefix}/{filename_prefix}{user_id}.json"
                 send_export_parts(filename, exported_data, method_name, chat_id)
             except Exception as error:
                 bot.send_message(
