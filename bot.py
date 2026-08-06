@@ -1,10 +1,13 @@
 import argparse
+import html
 import io
 import json
 import logging
 import re
+import threading
 import time
 import traceback
+from collections import deque
 from datetime import datetime
 
 import telebot
@@ -90,7 +93,12 @@ def send_menu(chat_id, text=None) -> None:
     bot.send_message(
         chat_id, text, parse_mode="HTML", reply_markup=main_keyboard()
     )
-    bot.send_message(chat_id, "Что будем делать?", reply_markup=menu_markup())
+    bot.send_message(
+        chat_id,
+        "<b>Что будем делать?</b>",
+        parse_mode="HTML",
+        reply_markup=menu_markup(),
+    )
 
 
 def features_text() -> str:
@@ -214,12 +222,13 @@ def format_profile(profile) -> dict:
 
 
 def profile_message(profile_data) -> str:
-    message = "".join(
-        f"<b>— {key}</b>: {value}\n" for key, value in profile_data.items()
-    )
-    for text_to_remove in config.TO_REMOVE:
-        message = message.replace(text_to_remove, "")
-    return message
+    rows = []
+    for key, value in profile_data.items():
+        value = str(value)
+        for text_to_remove in config.TO_REMOVE:
+            value = value.replace(text_to_remove, "")
+        rows.append(f"<b>— {key}</b>: {html.escape(value)}")
+    return "\n".join(rows)
 
 
 def is_authorized(user_id) -> bool:
@@ -235,12 +244,20 @@ def is_authorized(user_id) -> bool:
 
 @bot.message_handler(commands=["myid"])
 def my_id_message(message):
-    bot.send_message(message.chat.id, f"Telegram ID: {message.from_user.id}")
+    bot.send_message(
+        message.chat.id,
+        f"<b>Telegram ID:</b> <code>{message.from_user.id}</code>",
+        parse_mode="HTML",
+    )
 
 
 @bot.message_handler(func=lambda message: not is_authorized(message.from_user.id))
 def unauthorized_message(message):
-    bot.send_message(message.chat.id, "Пользователю запрещено использовать этого бота.")
+    bot.send_message(
+        message.chat.id,
+        "<b>Пользователю запрещено использовать этого бота.</b>",
+        parse_mode="HTML",
+    )
 
 
 @bot.callback_query_handler(func=lambda call: not is_authorized(call.from_user.id))
@@ -289,7 +306,12 @@ def menu_callback(call):
 def keyboard_action(message):
     if message.text == "🔎 Новый экспорт":
         waiting_for_identifier.add(message.chat.id)
-        bot.send_message(message.chat.id, "Отправьте ID, короткое имя или ссылку VK.", reply_markup=main_keyboard())
+        bot.send_message(
+            message.chat.id,
+            "<b>Отправьте ID, короткое имя или ссылку VK.</b>",
+            parse_mode="HTML",
+            reply_markup=main_keyboard(),
+        )
     elif message.text == "📋 Возможности":
         send_menu(message.chat.id, features_text())
     else:
@@ -298,12 +320,20 @@ def keyboard_action(message):
 
 @bot.message_handler(func=lambda message: message.text is not None)
 def get_info(message):
-    chat_id = message.from_user.id
-
+    chat_id = message.chat.id
     waiting_for_identifier.discard(chat_id)
+    user_input = get_user_input(message)
+    position = export_queue.enqueue(chat_id, user_input)
+    bot.send_message(
+        chat_id,
+        f"<b>Экспорт добавлен в очередь.</b> Позиция: {position}.",
+        parse_mode="HTML",
+    )
 
+
+def process_export(chat_id, user_input) -> None:
+    """Parse one VK page and send its export files to the requesting chat."""
     try:
-        user_input = get_user_input(message)
         profile_match = re.search(r"^(?:https?://)?(?:www\.)?(?:vk\.(?:com|ru)|vkontakte\.(?:com|ru))/([^/?#]+)",
             user_input.strip(), re.IGNORECASE)
         username = profile_match.group(1) if profile_match else user_input
@@ -314,7 +344,7 @@ def get_info(message):
         for text in util.split_string(profile_message(format_profile(profile)), 4096):
             bot.send_message(
                 chat_id,
-                f"<b>Parsing vk.ru/id{user_id}</b>\n{text}",
+            f"<b>Parsing</b> <code>vk.ru/id{user_id}</code>\n{text}",
                 parse_mode="HTML",
             )
 
@@ -332,21 +362,69 @@ def get_info(message):
             except Exception as error:
                 bot.send_message(
                     chat_id,
-                    f"error while parsing {method_name} section: {error}",
+                    f"<b>error while parsing</b> <code>{method_name}</code> section: "
+                    f"<code>{html.escape(str(error))}</code>",
                     parse_mode="HTML",
                 )
 
         end_time = int(time.time())
         bot.send_message(
             chat_id,
-            f"<b>End parsing for vk.ru/id{user_id}. "
-            f"Elapsed {end_time - start_time} seconds</b>",
+            f"<b>End parsing for</b> <code>vk.ru/id{user_id}</code>. "
+            f"<i>Elapsed {end_time - start_time} seconds</i>",
             parse_mode="HTML",
         )
     except Exception as error:
         error_message = "Looks like you entered an invalid ID or nickname."
-        bot.send_message(chat_id, f"<b>{error_message}\n{error}</b>", parse_mode="HTML")
+        bot.send_message(
+            chat_id,
+            f"<b>{error_message}</b>\n<code>{html.escape(str(error))}</code>",
+            parse_mode="HTML",
+        )
         logger.exception("Failed to process VK export request")
+
+
+class ExportQueue:
+    """Queue for VK export"""
+
+    def __init__(self, processor) -> None:
+        self.processor = processor
+        self.jobs = deque()
+        self.condition = threading.Condition()
+        self.is_processing = False
+        self.worker = threading.Thread(target=self.run, name="vk-export-worker", daemon=True)
+        self.worker.start()
+
+    def enqueue(self, chat_id, user_input) -> int:
+        """Add parse request and return position"""
+        with self.condition:
+            if self.is_processing:
+                task_precessing = 1
+            else:
+                task_precessing = 0
+            position = len(self.jobs) + task_precessing + 1
+            self.jobs.append((chat_id, user_input))
+            self.condition.notify()
+            return position
+
+    def run(self) -> None:
+        while True:
+            with self.condition:
+                while not self.jobs:
+                    self.condition.wait()
+                chat_id, user_input = self.jobs.popleft()
+                self.is_processing = True
+
+            try:
+                self.processor(chat_id, user_input)
+            except Exception:
+                logger.exception("Unexpected error in VK export queue worker")
+            finally:
+                with self.condition:
+                    self.is_processing = False
+
+
+export_queue = ExportQueue(process_export)
 
 while True:
     try:
