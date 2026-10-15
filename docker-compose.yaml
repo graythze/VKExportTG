@@ -1,0 +1,9 @@
+services:
+
+  vk-export-tg-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
