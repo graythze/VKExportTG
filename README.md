@@ -1,5 +1,3 @@
-# VKExportTG
-
 <h1 align="center">
   VKExportTG 📄
 
