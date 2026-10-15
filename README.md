@@ -4,7 +4,7 @@
   VKExportTG 📄
 
   [RUS](#о-проекте) // [ENG](#about)
-![image](https://user-images.githubusercontent.com/54765502/133928495-f5f8f111-2cb4-4b7b-96b6-f9f2bde090b2.png)
+![image](https://github.com/user-attachments/assets/bae0c01b-c8d3-4d2d-90d1-ca49d457100a)
 
 </h1>
 
@@ -48,26 +48,20 @@
 ### Установка и запуск
 
 1. Клонируйте репозиторий и перейдите в его каталог.
-2. Создайте виртуальное окружение (необязательно, но рекомендуется):
 
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate
-   ```
-
-3. Установите зависимости:
+2. Установите зависимости:
 
    ```bash
    python -m pip install -r requirements.txt
    ```
 
-4. Создайте файл `.env` на основе примера:
+3. Создайте файл `.env` на основе примера:
 
    ```bash
    cp .env.example .env
    ```
 
-5. Заполните `.env`:
+4. Заполните `.env`:
 
    ```dotenv
    TELEGRAM_TOKEN=токен_бота_из_BotFather
@@ -76,7 +70,7 @@
    VK_API_VER=5.82
    ```
 
-6. Запустите бота:
+5. Запустите бота:
 
    ```bash
    python bot.py
