@@ -1,7 +1,9 @@
+# VKExportTG
+
 <h1 align="center">
   VKExportTG 📄
 
-  [RUS](#-что-это) // [ENG](#-what-is-it)
+  [RUS](#о-проекте) // [ENG](#about)
 ![image](https://user-images.githubusercontent.com/54765502/133928495-f5f8f111-2cb4-4b7b-96b6-f9f2bde090b2.png)
 
 </h1>
@@ -10,122 +12,198 @@
   <a href="#rus"><b>RUS</b></a>
 </h1>
 
-# 📄 Что это?
+---
 
-VKExportTG позволяет экспортировать данные в файл JSON с личной страницы ВК или другого человека через Telegram бота
+### О проекте
 
+**VKExportTG** — Telegram-бот для выгрузки доступных данных публичного профиля VK в JSON. Отправьте боту числовой ID, короткое имя или ссылку на профиль — бот поставит задачу в очередь, покажет сведения о профиле и пришлёт результаты отдельными файлами.
 
-## ✅ Экспорт доступен для
-* Данных профиля <kbd>[users.get](https://vk.com/dev/users.get)</kbd>
-* Документов <kbd>[docs.get](https://vk.com/dev/docs.get)</kbd>
-* Друзей <kbd>[friends.get](https://vk.com/dev/friends.get)</kbd>
-* Подарков <kbd>[gifts.get](https://vk.com/dev/gifts.get)</kbd>
-* Заметок <kbd>[notes.get](https://vk.com/dev/notes.get)</kbd>
-* Фотографий <kbd>[photos.get](https://vk.com/dev/photos.get)</kbd>
-* Историй <kbd>[stories.get](https://vk.com/dev/stories.get)</kbd>
-* Видео <kbd>[video.get](https://vk.com/dev/video.get)</kbd>
-* Подписчиков <kbd>[users.getFollowers](https://vk.com/dev/users.getFollowers)</kbd>
-* Групп и публичных страниц <kbd>[groups.get](https://vk.com/dev/groups.get)</kbd>
-* Маркета <kbd>[market.get](https://vk.com/dev/market.get)</kbd>
-* Постов на стене <kbd>[wall.get](https://vk.com/dev/wall.get)</kbd>
+Доступность и состав данных определяются токеном VK и настройками приватности страницы. Используйте проект только для данных, на обработку которых у вас есть право.
 
-## ⚙️ Использование
-1) Скачайте скрипт
-2) Установите пакеты, используя команду `pip install -r requirements.txt`
-3) Установите `TELEGRAM_TOKEN` и `VK_TOKEN` в файле <kbd>settings.py</kbd>
-4) Запустите бота, используя команду `python bot.py`
+### Что экспортируется
 
-Команда `python bot.py -h` показана ниже
+Каждый раздел отправляется отдельным JSON-файлом:
 
+- профиль (`users.get`);
+- записи на стене (`wall.get`);
+- документы (`docs.get`);
+- фотографии (`photos.getAll`);
+- заметки (`notes.get`);
+- видео (`video.get`);
+- друзья (`friends.get`);
+- подарки (`gifts.get`);
+- истории (`stories.get`);
+- группы и публичные страницы (`groups.get`);
+- товары (`market.get`);
+- подписчики (`users.getFollowers`).
+
+Большие списки разбиваются на части по 5 000 записей. Ошибка в одном разделе не останавливает экспорт остальных.
+
+### Требования
+
+- Python 3.12+ или Docker;
+- Telegram Bot API token;
+- VK API access token.
+
+### Установка и запуск
+
+1. Клонируйте репозиторий и перейдите в его каталог.
+2. Создайте виртуальное окружение (необязательно, но рекомендуется):
+
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate
+   ```
+
+3. Установите зависимости:
+
+   ```bash
+   python -m pip install -r requirements.txt
+   ```
+
+4. Создайте файл `.env` на основе примера:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+5. Заполните `.env`:
+
+   ```dotenv
+   TELEGRAM_TOKEN=токен_бота_из_BotFather
+   VK_TOKEN=ваш_токен_VK
+   ALLOWED_USER_IDS=0
+   VK_API_VER=5.82
+   ```
+
+6. Запустите бота:
+
+   ```bash
+   python bot.py
+   ```
+
+Для подробных логов используйте `python bot.py --verbose`. Справка по аргументам: `python bot.py --help`.
+
+### Настройки
+
+| Переменная | Назначение | Значение по умолчанию |
+| --- | --- | --- |
+| `TELEGRAM_TOKEN` | Токен Telegram-бота | обязательна |
+| `VK_TOKEN` | Токен доступа VK API | обязательна |
+| `ALLOWED_USER_IDS` | Telegram ID пользователей через запятую; `0` разрешает доступ всем | `0` |
+| `VK_API_VER` | Версия VK API | `5.82` |
+
+Команда `/myid` показывает ваш Telegram ID. Команды `/start`, `/menu` и `/help` открывают меню. Бот также понимает `id1`, `1`, `durov` и ссылки формата `https://vk.ru/durov` или `https://vk.com/durov`.
+
+### Запуск в Docker
+
+Соберите образ:
+
+```bash
+docker build -t vk-export-tg .
 ```
-usage: bot.py [-h] [-v]
 
-Usage: python bot.py
+Запустите контейнер, передав настройки из `.env`:
 
-options:
-  -h, --help     show this help message and exit
-  -v, --verbose  Increase output verbosity
+```bash
+docker run --env-file .env --name vk-export-tg --restart unless-stopped vk-export-tg
 ```
 
+В проекте также есть `docker-compose.yaml` для сборки и управления сервисом. Перед запуском через Compose убедитесь, что переменные `TELEGRAM_TOKEN` и `VK_TOKEN` передаются в контейнер через настройки окружения сервиса.
 
-### 📍 Аргументы
-`-v, --verbose` — показать подробности
-
-
-## 🔌 Получение API токена
-### VK токен
-1) Откройте [vkhost.github.io](https://vkhost.github.io/)
-2) Выберите приложение. Лучше всего использовать приложения Kate Mobile или VFeed 
-3) Нажмите на выбранное приложение
-4) Нажмите на  "Продолжить как" или "Разрешить"
-5) Скопируйте часть URL начиная с `access_token= ` и заканчивая `&expires_in`
-6) Вставьте токен в скрипт
-
-Также можно использовать другие приложения или службы для получения VK токена
-### Telegram токен
-1) Откройте Telegram бота [@BotFarther](https://telegram.me/BotFather), он поможет в создании и будущем управлении ботом.
-2) Чтобы создать нового бота, введите `/newbot`. Следуйте инструкции.
-3) После создания бота в сообщении будет распологаться API токен, сгенерированный для бота
-
-### ***Вы можете разместить собственного бота на [Heroku](https://heroku.com/). Это [руководство](https://devcenter.heroku.com/articles/getting-started-with-python) поможет развернуть приложение Python за считанные минуты.***
 <h1 align="center">
   <a href="#eng"><b>ENG</b></a>
 </h1>
 
-## 📄 What is it?
-VKExportTG allows you to export data to a JSON file from a personal VK page or another page via a Telegram bot
+---
+### About
 
-## Export available for
-* Profile data <kbd>[users.get](https://vk.com/dev/users.get)</kbd>
-* Documents <kbd>[docs.get](https://vk.com/dev/docs.get)</kbd>
-* Friends <kbd>[friends.get](https://vk.com/dev/friends.get)</kbd>
-* Gifts <kbd>[gifts.get](https://vk.com/dev/gifts.get)</kbd>
-* Notes <kbd>[notes.get](https://vk.com/dev/notes.get)</kbd>
-* Photos <kbd>[photos.get](https://vk.com/dev/photos.get)</kbd>
-* Stories <kbd>[stories.get](https://vk.com/dev/stories.get)</kbd>
-* Videos <kbd>[video.get](https://vk.com/dev/video.get)</kbd>
-* Followers <kbd>[users.getFollowers](https://vk.com/dev/users.getFollowers)</kbd>
-* Groups, public pages <kbd>[groups.get](https://vk.com/dev/groups.get)</kbd>
-* Market items <kbd>[market.get](https://vk.com/dev/market.get)</kbd>
-* Wall posts <kbd>[wall.get](https://vk.com/dev/wall.get)</kbd>
+**VKExportTG** is a Telegram bot that exports available data from a public VK profile as JSON. Send the bot a numeric ID, screen name, or profile URL; it queues the task, displays a profile summary, and sends each export section as a separate file.
 
-## ⚙️ Usage
-1) Download script
-2) Install packages using `pip install -r requirements.txt`
-3) Set Telegram token in `TELEGRAM_TOKEN`, VK token in `VK_TOKEN` and VK API version in `V`.
-3) Run script using `python bot.py`
+The available data depends on the VK token and the profile privacy settings. Use the project only for data you are authorized to process.
 
-The command `python collector.py -h` is shown below
+### Exported data
+
+Each section is sent as a separate JSON file:
+
+- profile (`users.get`);
+- wall posts (`wall.get`);
+- documents (`docs.get`);
+- photos (`photos.getAll`);
+- notes (`notes.get`);
+- videos (`video.get`);
+- friends (`friends.get`);
+- gifts (`gifts.get`);
+- stories (`stories.get`);
+- groups and public pages (`groups.get`);
+- market items (`market.get`);
+- followers (`users.getFollowers`).
+
+Large lists are split into files of 5,000 items. An error in one section does not stop the remaining export.
+
+### Requirements
+
+- Python 3.12+ or Docker;
+- a Telegram Bot API token;
+- a VK API access token.
+
+### Install and run
+
+1. Clone the repository and open its directory.
+
+3. Install the dependencies:
+
+   ```bash
+   python -m pip install -r requirements.txt
+   ```
+
+4. Create `.env` from the example:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+5. Fill in `.env`:
+
+   ```dotenv
+   TELEGRAM_TOKEN=your_BotFather_token
+   VK_TOKEN=your_VK_token
+   ALLOWED_USER_IDS=0
+   VK_API_VER=5.82
+   ```
+
+6. Start the bot:
+
+   ```bash
+   python bot.py
+   ```
+
+Use `python bot.py --verbose` for detailed logs. Run `python bot.py --help` for command-line help.
+
+### Configuration
+
+| Variable | Description | Default |
+| --- | --- | --- |
+| `TELEGRAM_TOKEN` | Telegram bot token | required |
+| `VK_TOKEN` | VK API access token | required |
+| `ALLOWED_USER_IDS` | Comma-separated Telegram user IDs; `0` allows everyone | `0` |
+| `VK_API_VER` | VK API version | `5.82` |
+
+Use `/myid` to display your Telegram ID. `/start`, `/menu`, and `/help` open the menu. The bot accepts `id1`, `1`, `durov`, and profile URLs such as `https://vk.ru/durov` or `https://vk.com/durov`.
+
+### Docker
+
+Build the image:
+
+```bash
+docker build -t vk-export-tg .
 ```
-usage: bot.py [-h] [-v]
 
-Usage: python bot.py
+Run the container with the variables from `.env`:
 
-options:
-  -h, --help     show this help message and exit
-  -v, --verbose  Increase output verbosity
+```bash
+docker run --env-file .env --name vk-export-tg --restart unless-stopped vk-export-tg
 ```
 
-
-### 📍 Arguments
-`-v, --verbose` - Increase output verbosity
-
-
-## 🔌 Getting VK API token
-1) Visit [vkhost.github.io](https://vkhost.github.io/)
-2) Choose app. It's better to use token from Kate Mobile or VFeed apps 
-3) Click on app 
-4) Click on "Continue as" or "Allow"
-5) Copy part of URL from `access_token= `to `&expires_in`
-6) Paste token to CLI
-
-You can use other apps or services to get VK token.
-### Telegram token
-1) In Telegram, go to bot named [@BotFarther](https://telegram.me/BotFather) to create and manage your bot.
-2) To create a new bot type `/newbot` or click on it from menu.
-3) After creating Telegram bot. You will see in message a new API token generated for bot.
-
-
-### ***You can host own bot on [Heroku](https://heroku.com/). This [tutorial](https://devcenter.heroku.com/articles/getting-started-with-python) will have you deploying a Python app in minutes.***
-
+The repository also includes `docker-compose.yaml` for building and managing the service. Before running it with Compose, make sure `TELEGRAM_TOKEN` and `VK_TOKEN` are passed into the service container through its environment configuration.
 
