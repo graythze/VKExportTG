@@ -20,7 +20,7 @@
 
 ### Что экспортируется
 
-Каждый раздел отправляется отдельным JSON-файлом:
+Каждый раздел отправляется отдельным JSON-файлом с понятным именем, например `wall_123_1730000000.json`:
 
 - профиль (`users.get`);
 - записи на стене (`wall.get`);
@@ -35,7 +35,7 @@
 - товары (`market.get`);
 - подписчики (`users.getFollowers`).
 
-Большие списки разбиваются на части по 5 000 записей. Ошибка в одном разделе не останавливает экспорт остальных.
+Большие списки разбиваются на части по 5 000 записей. Ошибка в одном разделе не останавливает экспорт остальных. Бот сообщает о начале экспорта и текущем разделе. Экспорт в очереди можно отменить; для активного экспорта отмена сработает после завершения текущего запроса к VK.
 
 ### Требования
 
@@ -118,7 +118,7 @@ The available data depends on the VK token and the profile privacy settings. Use
 
 ### Exported data
 
-Each section is sent as a separate JSON file:
+Each section is sent as a separate JSON file with a simple name such as `wall_123_1730000000.json`:
 
 - profile (`users.get`);
 - wall posts (`wall.get`);
@@ -133,7 +133,7 @@ Each section is sent as a separate JSON file:
 - market items (`market.get`);
 - followers (`users.getFollowers`).
 
-Large lists are split into files of 5,000 items. An error in one section does not stop the remaining export.
+Large lists are split into files of 5,000 items. An error in one section does not stop the remaining export. The bot reports when an export starts and which section it is processing. You can cancel a queued export, or request cancellation of an active export; an active VK request is allowed to finish before processing stops.
 
 ### Requirements
 
