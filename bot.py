@@ -22,7 +22,7 @@ import config
 i18n.set("file_format", "json")
 i18n.set("filename_format", "{locale}.{format}")
 i18n.set("skip_locale_root_data", True)
-i18n.set("available_locales", ["ru", "en"])
+i18n.set("available_locales", ["en", "en"])
 i18n.set("locale", config.LANG)
 i18n.set("fallback", "ru")
 i18n.load_path.append(str(Path(__file__).resolve().parent / "locales"))
