@@ -85,7 +85,7 @@
 | `VK_TOKEN` | Токен доступа VK API | обязательна |
 | `ALLOWED_USER_IDS` | Telegram ID пользователей через запятую; `0` разрешает доступ всем | `0` |
 | `VK_API_VER` | Версия VK API | `5.82` |
-| `LANG` | Язык сообщений бота: `ru` или `en` | `ru` |
+| `LANG` | Язык сообщений бота: `ru` или `en` | `en` |
 
 Команда `/myid` показывает ваш Telegram ID. Команды `/start`, `/menu` и `/help` открывают меню. Бот также понимает `id1`, `1`, `durov` и ссылки формата `https://vk.ru/durov` или `https://vk.com/durov`.
 
