@@ -66,6 +66,7 @@
    VK_TOKEN=ваш_токен_VK
    ALLOWED_USER_IDS=0
    VK_API_VER=5.82
+   LANG=ru
    ```
 
 5. Запустите бота:
@@ -84,6 +85,7 @@
 | `VK_TOKEN` | Токен доступа VK API | обязательна |
 | `ALLOWED_USER_IDS` | Telegram ID пользователей через запятую; `0` разрешает доступ всем | `0` |
 | `VK_API_VER` | Версия VK API | `5.82` |
+| `LANG` | Язык сообщений бота: `ru` или `en` | `ru` |
 
 Команда `/myid` показывает ваш Telegram ID. Команды `/start`, `/menu` и `/help` открывают меню. Бот также понимает `id1`, `1`, `durov` и ссылки формата `https://vk.ru/durov` или `https://vk.com/durov`.
 
@@ -162,6 +164,7 @@ Large lists are split into files of 5,000 items. An error in one section does no
    VK_TOKEN=your_VK_token
    ALLOWED_USER_IDS=0
    VK_API_VER=5.82
+   LANG=en
    ```
 
 6. Start the bot:
@@ -180,6 +183,7 @@ Use `python bot.py --verbose` for detailed logs. Run `python bot.py --help` for 
 | `VK_TOKEN` | VK API access token | required |
 | `ALLOWED_USER_IDS` | Comma-separated Telegram user IDs; `0` allows everyone | `0` |
 | `VK_API_VER` | VK API version | `5.82` |
+| `LANG` | Bot message language: `ru` or `en` | `ru` |
 
 Use `/myid` to display your Telegram ID. `/start`, `/menu`, and `/help` open the menu. The bot accepts `id1`, `1`, `durov`, and profile URLs such as `https://vk.ru/durov` or `https://vk.com/durov`.
 

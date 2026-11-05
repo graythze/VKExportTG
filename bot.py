@@ -7,14 +7,25 @@ import re
 import threading
 import time
 import traceback
+from pathlib import Path
 from collections import deque
 from datetime import datetime
 
+import i18n
 import telebot
 from telebot import types, util
 
 import methods
 import config
+
+
+i18n.set("file_format", "json")
+i18n.set("filename_format", "{locale}.{format}")
+i18n.set("skip_locale_root_data", True)
+i18n.set("available_locales", ["ru", "en"])
+i18n.set("locale", config.LANG)
+i18n.set("fallback", "ru")
+i18n.load_path.append(str(Path(__file__).resolve().parent / "locales"))
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -68,9 +79,9 @@ def main_keyboard() -> types.ReplyKeyboardMarkup:
     """Persistent keyboard for the most common actions."""
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     keyboard.add(
-        types.KeyboardButton("🔎 Новый экспорт"),
-        types.KeyboardButton("💡 Примеры ввода"),
-        types.KeyboardButton("📋 Возможности")
+        types.KeyboardButton(i18n.t("button_export")),
+        types.KeyboardButton(i18n.t("button_examples")),
+        types.KeyboardButton(i18n.t("button_features"))
     )
     return keyboard
 
@@ -78,52 +89,34 @@ def main_keyboard() -> types.ReplyKeyboardMarkup:
 def menu_markup() -> types.InlineKeyboardMarkup:
     keyboard = types.InlineKeyboardMarkup(row_width=2)
     keyboard.add(
-        types.InlineKeyboardButton("🔎 Новый экспорт", callback_data="menu:export"),
-        types.InlineKeyboardButton("📋 Возможности", callback_data="menu:features"),
-        types.InlineKeyboardButton("💡 Примеры ввода", callback_data="menu:examples"),
+        types.InlineKeyboardButton(i18n.t("button_export"), callback_data="menu:export"),
+        types.InlineKeyboardButton(i18n.t("button_features"), callback_data="menu:features"),
+        types.InlineKeyboardButton(i18n.t("button_examples"), callback_data="menu:examples"),
     )
     return keyboard
 
 
 def send_menu(chat_id, text=None) -> None:
     text = text or (
-        "<b>VK Export</b>\n\n"
-        "Выберите действие ниже или отправьте ID, логин либо ссылку на профиль VK."
+        i18n.t("welcome")
     )
     bot.send_message(
         chat_id, text, parse_mode="HTML", reply_markup=main_keyboard()
     )
     bot.send_message(
         chat_id,
-        "<b>Что будем делать?</b>",
+        i18n.t("menu_prompt"),
         parse_mode="HTML",
         reply_markup=menu_markup(),
     )
 
 
 def features_text() -> str:
-    return (
-        "<b>📋 Что умеет бот</b>\n\n"
-        "• Загружает публичный профиль VK\n"
-        "• Экспортирует стену, фото, видео и документы\n"
-        "• Выгружает друзей, группы, подарки, истории и товары\n"
-        "• Отправляет каждый раздел отдельным JSON-файлом\n"
-        "• Большие файлы (>50МБ) автоматически разбиваются на части\n\n"
-        "Доступность данных зависит от настроек приватности VK."
-    )
+    return i18n.t("features")
 
 
 def examples_text() -> str:
-    return (
-        "<b>💡 Примеры ввода</b>\n\n"
-        "<code>durov</code>\n"
-        "<code>id1</code>\n"
-        "<code>1</code>\n"
-        "<code>https://vk.ru/durov</code>\n"
-        "<code>https://vk.com/durov</code>\n"
-        "<code>https://vkontakte.com/durov</code>\n"
-        "<code>https://vkontakte.ru/durov</code>\n"
-    )
+    return i18n.t("examples")
 
 
 def get_user_input(message):
@@ -166,42 +159,42 @@ def format_profile(profile) -> dict:
     result = {}
 
     if "id" in profile:
-        result["ID"] = profile["id"]
+        result[i18n.t("field_id")] = profile["id"]
     if profile.get("first_name") and profile.get("last_name"):
-        result["Name"] = f"{profile['first_name']} {profile['last_name']}"
+        result[i18n.t("field_name")] = f"{profile['first_name']} {profile['last_name']}"
     else:
         if profile.get("first_name"):
-            result["First name"] = profile["first_name"]
+            result[i18n.t("field_first_name")] = profile["first_name"]
         if profile.get("last_name"):
-            result["Last name"] = profile["last_name"]
+            result[i18n.t("field_last_name")] = profile["last_name"]
 
     optional_fields = {
-        "nickname": "Middle name",
-        "maiden_name": "Maiden name",
-        "bdate": "Birthday",
-        "site": "Site",
-        "status": "Status",
-        "mobile_phone": "Mobile",
-        "home_phone": "Home phone",
+        "nickname": i18n.t("field_middle_name"),
+        "maiden_name": i18n.t("field_maiden_name"),
+        "bdate": i18n.t("field_birthday"),
+        "site": i18n.t("field_site"),
+        "status": i18n.t("field_status"),
+        "mobile_phone": i18n.t("field_mobile"),
+        "home_phone": i18n.t("field_home_phone"),
     }
     for field, label in optional_fields.items():
         if profile.get(field):
             result[label] = profile[field]
 
     if profile.get("sex") == 1:
-        result["Sex"] = "Female"
+        result[i18n.t("field_sex")] = i18n.t("female")
     elif profile.get("sex") == 2:
-        result["Sex"] = "Male"
+        result[i18n.t("field_sex")] = i18n.t("male")
 
     if "last_seen" in profile and "deactivated" not in profile:
         last_seen = profile["last_seen"]
-        result["Last seen"] = datetime.fromtimestamp(last_seen["time"]).strftime(
+        result[i18n.t("field_last_seen")] = datetime.fromtimestamp(last_seen["time"]).strftime(
             "%Y-%m-%d %H:%M:%S"
         )
         if last_seen.get("platform") in PLATFORM_NAMES:
-            result["Platform"] = PLATFORM_NAMES[last_seen["platform"]]
+            result[i18n.t("field_platform")] = PLATFORM_NAMES[last_seen["platform"]]
     else:
-        result["Last seen"] = "Hidden by vk.me/app"
+        result[i18n.t("field_last_seen")] = i18n.t("hidden_last_seen")
 
     for name, prefix in SOCIAL_PREFIXES.items():
         if profile.get(name):
@@ -210,11 +203,11 @@ def format_profile(profile) -> dict:
     crop_photo = profile.get("crop_photo", {}).get("photo", {})
     sizes = crop_photo.get("sizes", [])
     if sizes:
-        result["Avatar"] = max(sizes, key=lambda size: int(size["width"]))["url"]
+        result[i18n.t("field_avatar")] = max(sizes, key=lambda size: int(size["width"]))["url"]
     elif profile.get("photo_max_orig"):
-        result["Avatar"] = profile["photo_max_orig"]
+        result[i18n.t("field_avatar")] = profile["photo_max_orig"]
     if crop_photo.get("date"):
-        result["Avatar date"] = datetime.fromtimestamp(crop_photo["date"]).strftime(
+        result[i18n.t("field_avatar_date")] = datetime.fromtimestamp(crop_photo["date"]).strftime(
             "%Y-%m-%d %H:%M:%S"
         )
 
@@ -246,7 +239,7 @@ def is_authorized(user_id) -> bool:
 def my_id_message(message):
     bot.send_message(
         message.chat.id,
-        f"<b>Telegram ID:</b> <code>{message.from_user.id}</code>",
+        i18n.t("telegram_id", user_id=message.from_user.id),
         parse_mode="HTML",
     )
 
@@ -255,7 +248,7 @@ def my_id_message(message):
 def unauthorized_message(message):
     bot.send_message(
         message.chat.id,
-        "<b>Пользователю запрещено использовать этого бота.</b>",
+        i18n.t("unauthorized"),
         parse_mode="HTML",
     )
 
@@ -264,7 +257,7 @@ def unauthorized_message(message):
 def unauthorized_callback(call):
     bot.answer_callback_query(
         call.id,
-        "Пользователю запрещено использовать этого бота.",
+        i18n.t("unauthorized"),
         show_alert=True,
     )
 
@@ -288,8 +281,7 @@ def menu_callback(call):
         waiting_for_identifier.add(call.message.chat.id)
         bot.send_message(
             call.message.chat.id,
-            "<b>🔎 Новый экспорт</b>\n\n"
-            "Отправьте ID, короткое имя или ссылку на профиль VK.",
+            i18n.t("export_prompt"),
             parse_mode="HTML",
             reply_markup=main_keyboard(),
         )
@@ -301,18 +293,18 @@ def menu_callback(call):
 
 
 @bot.message_handler(func=lambda message: message.text in {
-    "🔎 Новый экспорт", "💡 Примеры ввода", "📋 Возможности"
+    i18n.t("button_export"), i18n.t("button_examples"), i18n.t("button_features")
 })
 def keyboard_action(message):
-    if message.text == "🔎 Новый экспорт":
+    if message.text == i18n.t("button_export"):
         waiting_for_identifier.add(message.chat.id)
         bot.send_message(
             message.chat.id,
-            "<b>Отправьте ID, короткое имя или ссылку VK.</b>",
+            i18n.t("export_prompt_short"),
             parse_mode="HTML",
             reply_markup=main_keyboard(),
         )
-    elif message.text == "📋 Возможности":
+    elif message.text == i18n.t("button_features"):
         send_menu(message.chat.id, features_text())
     else:
         send_menu(message.chat.id, examples_text())
@@ -326,7 +318,7 @@ def get_info(message):
     position = export_queue.enqueue(chat_id, user_input)
     bot.send_message(
         chat_id,
-        f"<b>Экспорт добавлен в очередь.</b> Позиция: {position}.",
+        i18n.t("queued", position=position),
         parse_mode="HTML",
     )
 
@@ -344,7 +336,7 @@ def process_export(chat_id, user_input) -> None:
         for text in util.split_string(profile_message(format_profile(profile)), 4096):
             bot.send_message(
                 chat_id,
-            f"<b>Parsing</b> <code>vk.ru/id{user_id}</code>\n{text}",
+            f"<b>{i18n.t('parsing')}</b> <code>vk.ru/id{user_id}</code>\n{text}",
                 parse_mode="HTML",
             )
 
@@ -362,7 +354,7 @@ def process_export(chat_id, user_input) -> None:
             except Exception as error:
                 bot.send_message(
                     chat_id,
-                    f"<b>error while parsing</b> <code>{method_name}</code> section: "
+                    f"<b>{i18n.t('section_error', method=method_name)}</b> "
                     f"<code>{html.escape(str(error))}</code>",
                     parse_mode="HTML",
                 )
@@ -370,15 +362,13 @@ def process_export(chat_id, user_input) -> None:
         end_time = int(time.time())
         bot.send_message(
             chat_id,
-            f"<b>End parsing for</b> <code>vk.ru/id{user_id}</code>. "
-            f"<i>Elapsed {end_time - start_time} seconds</i>",
+            i18n.t("finished", user_id=user_id, seconds=end_time - start_time),
             parse_mode="HTML",
         )
     except Exception as error:
-        error_message = "Looks like you entered an invalid ID or nickname."
         bot.send_message(
             chat_id,
-            f"<b>{error_message}</b>\n<code>{html.escape(str(error))}</code>",
+            f"<b>{i18n.t('invalid_input')}</b>\n<code>{html.escape(str(error))}</code>",
             parse_mode="HTML",
         )
         logger.exception("Failed to process VK export request")
