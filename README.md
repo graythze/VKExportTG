@@ -20,7 +20,7 @@
 
 ### Что экспортируется
 
-Каждый раздел отправляется отдельным JSON-файлом:
+Каждый раздел отправляется отдельным JSON-файлом с понятным именем, например `wall123_1730000000.json`:
 
 - профиль (`users.get`);
 - записи на стене (`wall.get`);
@@ -35,7 +35,7 @@
 - товары (`market.get`);
 - подписчики (`users.getFollowers`).
 
-Большие списки разбиваются на части по 5 000 записей. Ошибка в одном разделе не останавливает экспорт остальных.
+Большие списки разбиваются на части по 5 000 записей. Ошибка в одном разделе не останавливает экспорт остальных. Бот сообщает о начале экспорта и текущем разделе. Экспорт в очереди можно отменить; для активного экспорта отмена сработает после завершения текущего запроса к VK.
 
 ### Требования
 
@@ -66,6 +66,19 @@
    VK_TOKEN=ваш_токен_VK
    ALLOWED_USER_IDS=0
    VK_API_VER=5.82
+   LANG=ru
+   PARSE_USERS_GET=True
+   PARSE_WALL_GET=True
+   PARSE_DOCS_GET=False
+   PARSE_PHOTOS_GET_ALL=False
+   PARSE_NOTES_GET=False
+   PARSE_VIDEOS_GET=False
+   PARSE_FRIENDS_GET=False
+   PARSE_GIFTS_GET=False
+   PARSE_STORIES_GET=False
+   PARSE_GROUPS_GET=False
+   PARSE_MARKET_GET=False
+   PARSE_FOLLOWERS_GET=False
    ```
 
 5. Запустите бота:
@@ -84,6 +97,8 @@
 | `VK_TOKEN` | Токен доступа VK API | обязательна |
 | `ALLOWED_USER_IDS` | Telegram ID пользователей через запятую; `0` разрешает доступ всем | `0` |
 | `VK_API_VER` | Версия VK API | `5.82` |
+| `LANG` | Язык сообщений бота: `ru` или `en` | `en` |
+| `PARSE_<METHOD>` | Включает соответствующий метод экспорта; допустимы `True` и `False` | `False` |
 
 Команда `/myid` показывает ваш Telegram ID. Команды `/start`, `/menu` и `/help` открывают меню. Бот также понимает `id1`, `1`, `durov` и ссылки формата `https://vk.ru/durov` или `https://vk.com/durov`.
 
@@ -116,7 +131,7 @@ The available data depends on the VK token and the profile privacy settings. Use
 
 ### Exported data
 
-Each section is sent as a separate JSON file:
+Each section is sent as a separate JSON file with a simple name such as `wall123_1730000000.json`:
 
 - profile (`users.get`);
 - wall posts (`wall.get`);
@@ -131,7 +146,7 @@ Each section is sent as a separate JSON file:
 - market items (`market.get`);
 - followers (`users.getFollowers`).
 
-Large lists are split into files of 5,000 items. An error in one section does not stop the remaining export.
+Large lists are split into files of 5,000 items. An error in one section does not stop the remaining export. The bot reports when an export starts and which section it is processing. You can cancel a queued export, or request cancellation of an active export; an active VK request is allowed to finish before processing stops.
 
 ### Requirements
 
@@ -162,6 +177,19 @@ Large lists are split into files of 5,000 items. An error in one section does no
    VK_TOKEN=your_VK_token
    ALLOWED_USER_IDS=0
    VK_API_VER=5.82
+   LANG=en
+   PARSE_USERS_GET=True
+   PARSE_WALL_GET=True
+   PARSE_DOCS_GET=False
+   PARSE_PHOTOS_GET_ALL=False
+   PARSE_NOTES_GET=False
+   PARSE_VIDEOS_GET=False
+   PARSE_FRIENDS_GET=False
+   PARSE_GIFTS_GET=False
+   PARSE_STORIES_GET=False
+   PARSE_GROUPS_GET=False
+   PARSE_MARKET_GET=False
+   PARSE_FOLLOWERS_GET=False
    ```
 
 6. Start the bot:
@@ -180,6 +208,8 @@ Use `python bot.py --verbose` for detailed logs. Run `python bot.py --help` for 
 | `VK_TOKEN` | VK API access token | required |
 | `ALLOWED_USER_IDS` | Comma-separated Telegram user IDs; `0` allows everyone | `0` |
 | `VK_API_VER` | VK API version | `5.82` |
+| `LANG` | Bot message language: `ru` or `en` | `en` |
+| `PARSE_<METHOD>` | Enables the matching export method; use `True` or `False` | `False` |
 
 Use `/myid` to display your Telegram ID. `/start`, `/menu`, and `/help` open the menu. The bot accepts `id1`, `1`, `durov`, and profile URLs such as `https://vk.ru/durov` or `https://vk.com/durov`.
 

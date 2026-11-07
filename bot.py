@@ -7,14 +7,25 @@ import re
 import threading
 import time
 import traceback
+from pathlib import Path
 from collections import deque
 from datetime import datetime
 
+import i18n
 import telebot
 from telebot import types, util
 
 import methods
 import config
+
+
+i18n.set("file_format", "json")
+i18n.set("filename_format", "{locale}.{format}")
+i18n.set("skip_locale_root_data", True)
+i18n.set("available_locales", ["ru", "en"])
+i18n.set("locale", config.LANG)
+i18n.set("fallback", "ru")
+i18n.load_path.append(str(Path(__file__).resolve().parent / "locales"))
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -68,9 +79,9 @@ def main_keyboard() -> types.ReplyKeyboardMarkup:
     """Persistent keyboard for the most common actions."""
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
     keyboard.add(
-        types.KeyboardButton("🔎 Новый экспорт"),
-        types.KeyboardButton("💡 Примеры ввода"),
-        types.KeyboardButton("📋 Возможности")
+        types.KeyboardButton(i18n.t("button_export")),
+        types.KeyboardButton(i18n.t("button_examples")),
+        types.KeyboardButton(i18n.t("button_features"))
     )
     return keyboard
 
@@ -78,52 +89,34 @@ def main_keyboard() -> types.ReplyKeyboardMarkup:
 def menu_markup() -> types.InlineKeyboardMarkup:
     keyboard = types.InlineKeyboardMarkup(row_width=2)
     keyboard.add(
-        types.InlineKeyboardButton("🔎 Новый экспорт", callback_data="menu:export"),
-        types.InlineKeyboardButton("📋 Возможности", callback_data="menu:features"),
-        types.InlineKeyboardButton("💡 Примеры ввода", callback_data="menu:examples"),
+        types.InlineKeyboardButton(i18n.t("button_export"), callback_data="menu:export"),
+        types.InlineKeyboardButton(i18n.t("button_features"), callback_data="menu:features"),
+        types.InlineKeyboardButton(i18n.t("button_examples"), callback_data="menu:examples"),
     )
     return keyboard
 
 
 def send_menu(chat_id, text=None) -> None:
     text = text or (
-        "<b>VK Export</b>\n\n"
-        "Выберите действие ниже или отправьте ID, логин либо ссылку на профиль VK."
+        i18n.t("welcome")
     )
     bot.send_message(
         chat_id, text, parse_mode="HTML", reply_markup=main_keyboard()
     )
     bot.send_message(
         chat_id,
-        "<b>Что будем делать?</b>",
+        i18n.t("menu_prompt"),
         parse_mode="HTML",
         reply_markup=menu_markup(),
     )
 
 
 def features_text() -> str:
-    return (
-        "<b>📋 Что умеет бот</b>\n\n"
-        "• Загружает публичный профиль VK\n"
-        "• Экспортирует стену, фото, видео и документы\n"
-        "• Выгружает друзей, группы, подарки, истории и товары\n"
-        "• Отправляет каждый раздел отдельным JSON-файлом\n"
-        "• Большие файлы (>50МБ) автоматически разбиваются на части\n\n"
-        "Доступность данных зависит от настроек приватности VK."
-    )
+    return i18n.t("features")
 
 
 def examples_text() -> str:
-    return (
-        "<b>💡 Примеры ввода</b>\n\n"
-        "<code>durov</code>\n"
-        "<code>id1</code>\n"
-        "<code>1</code>\n"
-        "<code>https://vk.ru/durov</code>\n"
-        "<code>https://vk.com/durov</code>\n"
-        "<code>https://vkontakte.com/durov</code>\n"
-        "<code>https://vkontakte.ru/durov</code>\n"
-    )
+    return i18n.t("examples")
 
 
 def get_user_input(message):
@@ -143,7 +136,7 @@ def send_export_file(filename, data, chat_id) -> None:
 
 
 def send_export_parts(filename, data, section_name, chat_id) -> None:
-    """Save and send a section in files of at most 1000 items."""
+    """Send a section in files of at most MAX_ITEMS_PER_FILE items."""
     all_items = data.get(section_name)
     if not isinstance(all_items, list) or len(all_items) <= MAX_ITEMS_PER_FILE:
         send_export_file(filename, data, chat_id)
@@ -166,42 +159,42 @@ def format_profile(profile) -> dict:
     result = {}
 
     if "id" in profile:
-        result["ID"] = profile["id"]
+        result[i18n.t("field_id")] = profile["id"]
     if profile.get("first_name") and profile.get("last_name"):
-        result["Name"] = f"{profile['first_name']} {profile['last_name']}"
+        result[i18n.t("field_name")] = f"{profile['first_name']} {profile['last_name']}"
     else:
         if profile.get("first_name"):
-            result["First name"] = profile["first_name"]
+            result[i18n.t("field_first_name")] = profile["first_name"]
         if profile.get("last_name"):
-            result["Last name"] = profile["last_name"]
+            result[i18n.t("field_last_name")] = profile["last_name"]
 
     optional_fields = {
-        "nickname": "Middle name",
-        "maiden_name": "Maiden name",
-        "bdate": "Birthday",
-        "site": "Site",
-        "status": "Status",
-        "mobile_phone": "Mobile",
-        "home_phone": "Home phone",
+        "nickname": i18n.t("field_middle_name"),
+        "maiden_name": i18n.t("field_maiden_name"),
+        "bdate": i18n.t("field_birthday"),
+        "site": i18n.t("field_site"),
+        "status": i18n.t("field_status"),
+        "mobile_phone": i18n.t("field_mobile"),
+        "home_phone": i18n.t("field_home_phone"),
     }
     for field, label in optional_fields.items():
         if profile.get(field):
             result[label] = profile[field]
 
     if profile.get("sex") == 1:
-        result["Sex"] = "Female"
+        result[i18n.t("field_sex")] = i18n.t("female")
     elif profile.get("sex") == 2:
-        result["Sex"] = "Male"
+        result[i18n.t("field_sex")] = i18n.t("male")
 
     if "last_seen" in profile and "deactivated" not in profile:
         last_seen = profile["last_seen"]
-        result["Last seen"] = datetime.fromtimestamp(last_seen["time"]).strftime(
+        result[i18n.t("field_last_seen")] = datetime.fromtimestamp(last_seen["time"]).strftime(
             "%Y-%m-%d %H:%M:%S"
         )
         if last_seen.get("platform") in PLATFORM_NAMES:
-            result["Platform"] = PLATFORM_NAMES[last_seen["platform"]]
+            result[i18n.t("field_platform")] = PLATFORM_NAMES[last_seen["platform"]]
     else:
-        result["Last seen"] = "Hidden by vk.me/app"
+        result[i18n.t("field_last_seen")] = i18n.t("hidden_last_seen")
 
     for name, prefix in SOCIAL_PREFIXES.items():
         if profile.get(name):
@@ -210,11 +203,11 @@ def format_profile(profile) -> dict:
     crop_photo = profile.get("crop_photo", {}).get("photo", {})
     sizes = crop_photo.get("sizes", [])
     if sizes:
-        result["Avatar"] = max(sizes, key=lambda size: int(size["width"]))["url"]
+        result[i18n.t("field_avatar")] = max(sizes, key=lambda size: int(size["width"]))["url"]
     elif profile.get("photo_max_orig"):
-        result["Avatar"] = profile["photo_max_orig"]
+        result[i18n.t("field_avatar")] = profile["photo_max_orig"]
     if crop_photo.get("date"):
-        result["Avatar date"] = datetime.fromtimestamp(crop_photo["date"]).strftime(
+        result[i18n.t("field_avatar_date")] = datetime.fromtimestamp(crop_photo["date"]).strftime(
             "%Y-%m-%d %H:%M:%S"
         )
 
@@ -246,7 +239,7 @@ def is_authorized(user_id) -> bool:
 def my_id_message(message):
     bot.send_message(
         message.chat.id,
-        f"<b>Telegram ID:</b> <code>{message.from_user.id}</code>",
+        i18n.t("telegram_id", user_id=message.from_user.id),
         parse_mode="HTML",
     )
 
@@ -255,7 +248,7 @@ def my_id_message(message):
 def unauthorized_message(message):
     bot.send_message(
         message.chat.id,
-        "<b>Пользователю запрещено использовать этого бота.</b>",
+        i18n.t("unauthorized"),
         parse_mode="HTML",
     )
 
@@ -264,7 +257,7 @@ def unauthorized_message(message):
 def unauthorized_callback(call):
     bot.answer_callback_query(
         call.id,
-        "Пользователю запрещено использовать этого бота.",
+        i18n.t("unauthorized"),
         show_alert=True,
     )
 
@@ -277,6 +270,7 @@ def regular_message(message):
 
 @bot.message_handler(commands=["help"])
 def help_message(message):
+    waiting_for_identifier.discard(message.chat.id)
     send_menu(message.chat.id, features_text())
 
 
@@ -284,12 +278,13 @@ def help_message(message):
 def menu_callback(call):
     action = call.data.split(":", 1)[1]
     bot.answer_callback_query(call.id)
+    if action != "export":
+        waiting_for_identifier.discard(call.message.chat.id)
     if action == "export":
         waiting_for_identifier.add(call.message.chat.id)
         bot.send_message(
             call.message.chat.id,
-            "<b>🔎 Новый экспорт</b>\n\n"
-            "Отправьте ID, короткое имя или ссылку на профиль VK.",
+            i18n.t("export_prompt"),
             parse_mode="HTML",
             reply_markup=main_keyboard(),
         )
@@ -301,86 +296,131 @@ def menu_callback(call):
 
 
 @bot.message_handler(func=lambda message: message.text in {
-    "🔎 Новый экспорт", "💡 Примеры ввода", "📋 Возможности"
+    i18n.t("button_export"), i18n.t("button_examples"), i18n.t("button_features")
 })
 def keyboard_action(message):
-    if message.text == "🔎 Новый экспорт":
+    if message.text == i18n.t("button_export"):
         waiting_for_identifier.add(message.chat.id)
         bot.send_message(
             message.chat.id,
-            "<b>Отправьте ID, короткое имя или ссылку VK.</b>",
+            i18n.t("export_prompt_short"),
             parse_mode="HTML",
             reply_markup=main_keyboard(),
         )
-    elif message.text == "📋 Возможности":
+    elif message.text == i18n.t("button_features"):
+        waiting_for_identifier.discard(message.chat.id)
         send_menu(message.chat.id, features_text())
     else:
+        waiting_for_identifier.discard(message.chat.id)
         send_menu(message.chat.id, examples_text())
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("cancel:"))
+def cancel_export_callback(call):
+    try:
+        job_id = int(call.data.split(":", 1)[1])
+    except ValueError:
+        bot.answer_callback_query(call.id, i18n.t("cancel_unavailable"), show_alert=True)
+        return
+    job, state = export_queue.cancel(call.message.chat.id, job_id)
+    if not job:
+        bot.answer_callback_query(call.id, i18n.t("cancel_unavailable"), show_alert=True)
+        return
+    bot.answer_callback_query(call.id)
+    if state == "queued":
+        export_queue.set_status(job, "cancelled", i18n.t("export_cancelled"))
+    else:
+        export_queue.update_message(
+            job["chat_id"], job["message_id"], i18n.t("cancel_requested"), job["id"]
+        )
 
 
 @bot.message_handler(func=lambda message: message.text is not None)
 def get_info(message):
     chat_id = message.chat.id
-    waiting_for_identifier.discard(chat_id)
+    if chat_id not in waiting_for_identifier:
+        bot.send_message(chat_id, i18n.t("unknown_message"), parse_mode="HTML")
+        return
     user_input = get_user_input(message)
-    position = export_queue.enqueue(chat_id, user_input)
-    bot.send_message(
-        chat_id,
-        f"<b>Экспорт добавлен в очередь.</b> Позиция: {position}.",
-        parse_mode="HTML",
+    if not user_input:
+        bot.send_message(chat_id, i18n.t("invalid_input"), parse_mode="HTML")
+        return
+    waiting_for_identifier.discard(chat_id)
+    status = bot.send_message(chat_id, i18n.t("queue_adding"), parse_mode="HTML")
+    job_id, position = export_queue.enqueue(chat_id, user_input, status.message_id)
+    export_queue.update_message(
+        chat_id, status.message_id, i18n.t("queued", position=position), job_id
     )
+    export_queue.activate()
 
 
-def process_export(chat_id, user_input) -> None:
+def process_export(job) -> None:
     """Parse one VK page and send its export files to the requesting chat."""
+    chat_id, user_input = job["chat_id"], job["user_input"]
     try:
+        export_queue.set_status(job, "running", i18n.t("export_started"))
         profile_match = re.search(r"^(?:https?://)?(?:www\.)?(?:vk\.(?:com|ru)|vkontakte\.(?:com|ru))/([^/?#]+)",
             user_input.strip(), re.IGNORECASE)
         username = profile_match.group(1) if profile_match else user_input
         user_id = methods.get_numeric_id(username)
         start_time = int(time.time())
-        profile = methods.users_get(user_id, args.verbose)[0]
+        if config.PARSE_METHODS["users_get"]:
+            profile = methods.users_get(user_id, args.verbose)[0]
+            for text in util.split_string(profile_message(format_profile(profile)), 4096):
+                bot.send_message(
+                    chat_id,
+                    f"<b>{i18n.t('parsing')}</b> <code>vk.ru/id{user_id}</code>\n{text}",
+                    parse_mode="HTML",
+                )
 
-        for text in util.split_string(profile_message(format_profile(profile)), 4096):
-            bot.send_message(
-                chat_id,
-            f"<b>Parsing</b> <code>vk.ru/id{user_id}</code>\n{text}",
-                parse_mode="HTML",
+        export_stamp = int(time.time())
+        active_sections = tuple(
+            (method_name, filename_prefix)
+            for method_name, filename_prefix in EXPORT_SECTIONS
+            if config.PARSE_METHODS[method_name]
+        )
+
+        for section_index, (method_name, filename_prefix) in enumerate(active_sections, start=1):
+            if job["cancel_requested"]:
+                export_queue.set_status(job, "cancelled", i18n.t("export_cancelled"))
+                return
+            export_queue.set_status(
+                job, "running",
+                i18n.t("section_progress", current=section_index, total=len(active_sections), section=filename_prefix),
             )
-
-        export_prefix = f"export{user_id}_{int(time.time())}"
-
-        for method_name, filename_prefix in EXPORT_SECTIONS:
             try:
                 exported_data = {
                     method_name: getattr(methods, method_name)(
                         user_id, args.verbose
                     ),
                 }
-                filename = f"{export_prefix}/{filename_prefix}{user_id}.json"
+                filename = f"{filename_prefix}{user_id}_{export_stamp}.json"
                 send_export_parts(filename, exported_data, method_name, chat_id)
             except Exception as error:
                 bot.send_message(
                     chat_id,
-                    f"<b>error while parsing</b> <code>{method_name}</code> section: "
+                    f"<b>{i18n.t('section_error', method=method_name)}</b> "
                     f"<code>{html.escape(str(error))}</code>",
                     parse_mode="HTML",
                 )
 
+        if job["cancel_requested"]:
+            export_queue.set_status(job, "cancelled", i18n.t("export_cancelled"))
+            return
         end_time = int(time.time())
         bot.send_message(
             chat_id,
-            f"<b>End parsing for</b> <code>vk.ru/id{user_id}</code>. "
-            f"<i>Elapsed {end_time - start_time} seconds</i>",
+            i18n.t("finished", user_id=user_id, seconds=end_time - start_time),
             parse_mode="HTML",
         )
+        export_queue.set_status(job, "finished", i18n.t("export_finished"))
     except Exception as error:
-        error_message = "Looks like you entered an invalid ID or nickname."
         bot.send_message(
             chat_id,
-            f"<b>{error_message}</b>\n<code>{html.escape(str(error))}</code>",
+            f"<b>{i18n.t('invalid_input')}</b>\n<code>{html.escape(str(error))}</code>",
             parse_mode="HTML",
         )
+        export_queue.set_status(job, "failed", i18n.t("export_failed"))
         logger.exception("Failed to process VK export request")
 
 
@@ -392,10 +432,12 @@ class ExportQueue:
         self.jobs = deque()
         self.condition = threading.Condition()
         self.is_processing = False
+        self.current_job = None
+        self.next_job_id = 1
         self.worker = threading.Thread(target=self.run, name="vk-export-worker", daemon=True)
         self.worker.start()
 
-    def enqueue(self, chat_id, user_input) -> int:
+    def enqueue(self, chat_id, user_input, message_id) -> tuple[int, int]:
         """Add parse request and return position"""
         with self.condition:
             if self.is_processing:
@@ -403,25 +445,63 @@ class ExportQueue:
             else:
                 task_precessing = 0
             position = len(self.jobs) + task_precessing + 1
-            self.jobs.append((chat_id, user_input))
+            job_id = self.next_job_id
+            self.next_job_id += 1
+            job = {"id": job_id, "chat_id": chat_id, "user_input": user_input,
+                   "message_id": message_id, "status": "queued", "cancel_requested": False}
+            self.jobs.append(job)
+            return job_id, position
+
+    def activate(self):
+        with self.condition:
             self.condition.notify()
-            return position
+
+    def update_message(self, chat_id, message_id, text, job_id=None):
+        markup = None
+        if job_id is not None:
+            markup = types.InlineKeyboardMarkup()
+            markup.add(types.InlineKeyboardButton(i18n.t("button_cancel"), callback_data=f"cancel:{job_id}"))
+        try:
+            bot.edit_message_text(text, chat_id, message_id, parse_mode="HTML", reply_markup=markup)
+        except Exception:
+            logger.debug("Could not update export status message", exc_info=True)
+
+    def set_status(self, job, status, text):
+        with self.condition:
+            job["status"] = status
+        self.update_message(job["chat_id"], job["message_id"], text,
+                            job["id"] if status in {"queued", "running"} else None)
+
+    def cancel(self, chat_id, job_id):
+        with self.condition:
+            for job in list(self.jobs):
+                if job["id"] == job_id and job["chat_id"] == chat_id:
+                    self.jobs.remove(job)
+                    job["status"] = "cancelled"
+                    return job, "queued"
+            job = self.current_job
+            if job and job["id"] == job_id and job["chat_id"] == chat_id and job["status"] in {"queued", "running"}:
+                job["cancel_requested"] = True
+                return job, "running"
+        return None, None
 
     def run(self) -> None:
         while True:
             with self.condition:
                 while not self.jobs:
                     self.condition.wait()
-                chat_id, user_input = self.jobs.popleft()
+                job = self.jobs.popleft()
                 self.is_processing = True
+                self.current_job = job
 
             try:
-                self.processor(chat_id, user_input)
+                self.processor(job)
             except Exception:
                 logger.exception("Unexpected error in VK export queue worker")
             finally:
                 with self.condition:
                     self.is_processing = False
+                    self.current_job = None
 
 
 export_queue = ExportQueue(process_export)
