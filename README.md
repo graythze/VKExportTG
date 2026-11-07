@@ -20,7 +20,7 @@
 
 ### Что экспортируется
 
-Каждый раздел отправляется отдельным JSON-файлом с понятным именем, например `wall_123_1730000000.json`:
+Каждый раздел отправляется отдельным JSON-файлом с понятным именем, например `wall123_1730000000.json`:
 
 - профиль (`users.get`);
 - записи на стене (`wall.get`);
@@ -131,7 +131,7 @@ The available data depends on the VK token and the profile privacy settings. Use
 
 ### Exported data
 
-Each section is sent as a separate JSON file with a simple name such as `wall_123_1730000000.json`:
+Each section is sent as a separate JSON file with a simple name such as `wall123_1730000000.json`:
 
 - profile (`users.get`);
 - wall posts (`wall.get`);
@@ -208,7 +208,7 @@ Use `python bot.py --verbose` for detailed logs. Run `python bot.py --help` for 
 | `VK_TOKEN` | VK API access token | required |
 | `ALLOWED_USER_IDS` | Comma-separated Telegram user IDs; `0` allows everyone | `0` |
 | `VK_API_VER` | VK API version | `5.82` |
-| `LANG` | Bot message language: `ru` or `en` | `ru` |
+| `LANG` | Bot message language: `ru` or `en` | `en` |
 | `PARSE_<METHOD>` | Enables the matching export method; use `True` or `False` | `False` |
 
 Use `/myid` to display your Telegram ID. `/start`, `/menu`, and `/help` open the menu. The bot accepts `id1`, `1`, `durov`, and profile URLs such as `https://vk.ru/durov` or `https://vk.com/durov`.
