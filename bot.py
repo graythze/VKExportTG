@@ -394,7 +394,7 @@ def process_export(job) -> None:
                         user_id, args.verbose
                     ),
                 }
-                filename = f"{filename_prefix}_{user_id}_{export_stamp}.json"
+                filename = f"{filename_prefix}{user_id}_{export_stamp}.json"
                 send_export_parts(filename, exported_data, method_name, chat_id)
             except Exception as error:
                 bot.send_message(
