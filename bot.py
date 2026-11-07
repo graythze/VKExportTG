@@ -364,24 +364,29 @@ def process_export(job) -> None:
         username = profile_match.group(1) if profile_match else user_input
         user_id = methods.get_numeric_id(username)
         start_time = int(time.time())
-        profile = methods.users_get(user_id, args.verbose)[0]
-
-        for text in util.split_string(profile_message(format_profile(profile)), 4096):
-            bot.send_message(
-                chat_id,
-            f"<b>{i18n.t('parsing')}</b> <code>vk.ru/id{user_id}</code>\n{text}",
-                parse_mode="HTML",
-            )
+        if config.PARSE_METHODS["users_get"]:
+            profile = methods.users_get(user_id, args.verbose)[0]
+            for text in util.split_string(profile_message(format_profile(profile)), 4096):
+                bot.send_message(
+                    chat_id,
+                    f"<b>{i18n.t('parsing')}</b> <code>vk.ru/id{user_id}</code>\n{text}",
+                    parse_mode="HTML",
+                )
 
         export_stamp = int(time.time())
+        active_sections = tuple(
+            (method_name, filename_prefix)
+            for method_name, filename_prefix in EXPORT_SECTIONS
+            if config.PARSE_METHODS[method_name]
+        )
 
-        for section_index, (method_name, filename_prefix) in enumerate(EXPORT_SECTIONS, start=1):
+        for section_index, (method_name, filename_prefix) in enumerate(active_sections, start=1):
             if job["cancel_requested"]:
                 export_queue.set_status(job, "cancelled", i18n.t("export_cancelled"))
                 return
             export_queue.set_status(
                 job, "running",
-                i18n.t("section_progress", current=section_index, total=len(EXPORT_SECTIONS), section=filename_prefix),
+                i18n.t("section_progress", current=section_index, total=len(active_sections), section=filename_prefix),
             )
             try:
                 exported_data = {

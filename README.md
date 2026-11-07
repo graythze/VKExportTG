@@ -67,6 +67,18 @@
    ALLOWED_USER_IDS=0
    VK_API_VER=5.82
    LANG=ru
+   PARSE_USERS_GET=True
+   PARSE_WALL_GET=True
+   PARSE_DOCS_GET=False
+   PARSE_PHOTOS_GET_ALL=False
+   PARSE_NOTES_GET=False
+   PARSE_VIDEOS_GET=False
+   PARSE_FRIENDS_GET=False
+   PARSE_GIFTS_GET=False
+   PARSE_STORIES_GET=False
+   PARSE_GROUPS_GET=False
+   PARSE_MARKET_GET=False
+   PARSE_FOLLOWERS_GET=False
    ```
 
 5. Запустите бота:
@@ -86,6 +98,7 @@
 | `ALLOWED_USER_IDS` | Telegram ID пользователей через запятую; `0` разрешает доступ всем | `0` |
 | `VK_API_VER` | Версия VK API | `5.82` |
 | `LANG` | Язык сообщений бота: `ru` или `en` | `en` |
+| `PARSE_<METHOD>` | Включает соответствующий метод экспорта; допустимы `True` и `False` | `False` |
 
 Команда `/myid` показывает ваш Telegram ID. Команды `/start`, `/menu` и `/help` открывают меню. Бот также понимает `id1`, `1`, `durov` и ссылки формата `https://vk.ru/durov` или `https://vk.com/durov`.
 
@@ -165,6 +178,18 @@ Large lists are split into files of 5,000 items. An error in one section does no
    ALLOWED_USER_IDS=0
    VK_API_VER=5.82
    LANG=en
+   PARSE_USERS_GET=True
+   PARSE_WALL_GET=True
+   PARSE_DOCS_GET=False
+   PARSE_PHOTOS_GET_ALL=False
+   PARSE_NOTES_GET=False
+   PARSE_VIDEOS_GET=False
+   PARSE_FRIENDS_GET=False
+   PARSE_GIFTS_GET=False
+   PARSE_STORIES_GET=False
+   PARSE_GROUPS_GET=False
+   PARSE_MARKET_GET=False
+   PARSE_FOLLOWERS_GET=False
    ```
 
 6. Start the bot:
@@ -184,6 +209,7 @@ Use `python bot.py --verbose` for detailed logs. Run `python bot.py --help` for 
 | `ALLOWED_USER_IDS` | Comma-separated Telegram user IDs; `0` allows everyone | `0` |
 | `VK_API_VER` | VK API version | `5.82` |
 | `LANG` | Bot message language: `ru` or `en` | `ru` |
+| `PARSE_<METHOD>` | Enables the matching export method; use `True` or `False` | `False` |
 
 Use `/myid` to display your Telegram ID. `/start`, `/menu`, and `/help` open the menu. The bot accepts `id1`, `1`, `durov`, and profile URLs such as `https://vk.ru/durov` or `https://vk.com/durov`.
 
